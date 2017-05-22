@@ -286,3 +286,4 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+/MediaSvcsIndexer2Demo/MediaSvcsIndexer2Demo/azure.cfg

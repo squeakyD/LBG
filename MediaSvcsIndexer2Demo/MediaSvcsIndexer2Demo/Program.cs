@@ -7,14 +7,15 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.MediaServices.Client;
+using Serilog;
 
 namespace MediaSvcsIndexer2Demo
 {
     class Program
     {
         // Read values from the App.config file.
-        private static readonly string _mediaServicesAccountName = ConfigurationManager.AppSettings["MediaServicesAccountName"];
-        private static readonly string _mediaServicesAccountKey = ConfigurationManager.AppSettings["MediaServicesAccountKey"];
+        //private static readonly string _mediaServicesAccountName = ConfigurationManager.AppSettings["MediaServicesAccountName"];
+        //private static readonly string _mediaServicesAccountKey = ConfigurationManager.AppSettings["MediaServicesAccountKey"];
         private static readonly string _sourceDir = ConfigurationManager.AppSettings["SourceDirectory"];
         private static readonly string _outDir = ConfigurationManager.AppSettings["OutputDirectory"];
 
@@ -23,43 +24,73 @@ namespace MediaSvcsIndexer2Demo
         private static MediaServicesCredentials _cachedCredentials = null;
         private static bool _delFiles;
 
+        private static ILogger _logger;
+
         static void Main(string[] args)
         {
-            // Create and cache the Media Services credentials in a static class variable.
-            _cachedCredentials = new MediaServicesCredentials(_mediaServicesAccountName, _mediaServicesAccountKey);
-            // Used the cached credentials to create CloudMediaContext.
-            _context = new CloudMediaContext(_cachedCredentials);
-
-            if (args.Length > 0)
+            try
             {
-                if (args[0].Equals("delOnly", StringComparison.InvariantCultureIgnoreCase))
+                _logger = Logger.GetLog<Program>();
+
+                CreateCredentials();
+
+                // Used the cached credentials to create CloudMediaContext.
+                _context = new CloudMediaContext(_cachedCredentials);
+
+                if (args.Length > 0)
+                {
+                    if (args[0].Equals("delOnly", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        DeleteAssetFiles();
+                        return;
+                    }
+
+                    if (args[0].Equals("delAfter", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _delFiles = true;
+                    }
+                }
+
+                // Run indexing job.
+                string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
+                var asset = RunIndexingJob(src, @"..\..\config.json");
+
+                // Download the job output asset.
+                DownloadAsset(asset, _outDir);
+
+                if (_delFiles)
                 {
                     DeleteAssetFiles();
-                    return;
-                }
-
-                if (args[0].Equals("delAfter", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    _delFiles = true;
                 }
             }
-
-            // Run indexing job.
-                    string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
-            var asset = RunIndexingJob(src, @"..\..\config.json");
-
-            // Download the job output asset.
-            DownloadAsset(asset, _outDir);
-
-            if (_delFiles)
+            catch (Exception ex)
             {
-                DeleteAssetFiles();
+                _logger.Error(ex, "Fatal error in demo program!!!");
+                //Console.WriteLine(ex);
+                //throw;
             }
+        }
+
+        private static void CreateCredentials()
+        {
+            _logger.Debug("Logging in");
+
+            string accountName;
+            string accountKey;
+
+            string cfg = Path.Combine(ConfigurationManager.AppSettings["AzureCfg"], "azure.cfg");
+            using (var st = File.OpenText(cfg))
+            {
+                accountName = st.ReadLine();
+                accountKey = st.ReadLine();
+            }
+
+            _cachedCredentials = new MediaServicesCredentials(accountName, accountKey);
         }
 
         static IAsset RunIndexingJob(string inputMediaFilePath, string configurationFile)
         {
-            Console.WriteLine($"Running index job for {inputMediaFilePath}");
+            _logger.Information("Running index job for {inputMediaFilePath}", inputMediaFilePath);
 
             // Create an asset and upload the input media file to storage.
             IAsset asset = CreateAssetAndUploadSingleFile(inputMediaFilePath,
@@ -83,6 +114,8 @@ namespace MediaSvcsIndexer2Demo
                 configuration,
                 TaskOptions.None);
 
+            _logger.Debug("Created task {taskId} for job", task.Id);
+
             // Specify the input asset to be indexed.
             task.InputAssets.Add(asset);
 
@@ -91,6 +124,8 @@ namespace MediaSvcsIndexer2Demo
 
             // Use the following event handler to check job progress.  
             job.StateChanged += new EventHandler<JobStateChangedEventArgs>(StateChanged);
+
+            _logger.Information("Submitted job {jobId}", job.Id);
 
             // Launch the job.
             job.Submit();
@@ -106,7 +141,7 @@ namespace MediaSvcsIndexer2Demo
             if (job.State == JobState.Error)
             {
                 ErrorDetail error = job.Tasks.First().ErrorDetails.First();
-                Console.WriteLine($"Error: {error.Code}. {error.Message}");
+                _logger.Warning($"Error: {error.Code}. {error.Message}");
                 return null;
             }
 
@@ -119,29 +154,29 @@ namespace MediaSvcsIndexer2Demo
 
             var assetFile = asset.AssetFiles.Create(Path.GetFileName(filePath));
             assetFile.Upload(filePath);
-            Console.WriteLine($"Uploaded {filePath}");
+            _logger.Information("Uploaded {filePath}", filePath);
 
             return asset;
         }
 
         static void DownloadAsset(IAsset asset, string outputDirectory)
         {
-            Console.WriteLine("Downloading files");
+            _logger.Debug("Downloading files");
             foreach (IAssetFile file in asset.AssetFiles)
             {
-                Console.WriteLine($"Downloading {file.Name}");
+                _logger.Information($"Downloading {file.Name}");
                 file.Download(Path.Combine(outputDirectory, file.Name));
 
                 if (_delFiles)
                 {
-                    Console.WriteLine($"Deleting output file {file.Name} in asset {asset.Name}");
+                    _logger.Debug($"Deleting output file {file.Name} in asset {asset.Name}");
                     file.Delete();
                 }
             }
 
             if (_delFiles)
             {
-                Console.WriteLine($"Deleting output asset {asset.Name}");
+                _logger.Debug($"Deleting output asset {asset.Name}");
                 asset.Delete();
             }
         }
@@ -152,11 +187,11 @@ namespace MediaSvcsIndexer2Demo
             {
                 foreach (var af in asset.AssetFiles)
                 {
-                    Console.WriteLine($"Deleting {af.Name}");
+                    _logger.Information("Deleting {file} from asset {asset}", af.Name, new {asset.Name, asset.Id});
                     af.Delete();
                 }
 
-                Console.WriteLine($"Deleting asset {asset.Name}");
+                _logger.Information($"Deleting asset {asset}", new {asset.Name, asset.Id});
                 asset.Delete();
             }
         }
@@ -186,6 +221,7 @@ namespace MediaSvcsIndexer2Demo
                 case JobState.Finished:
                     Console.WriteLine();
                     Console.WriteLine("Job is finished.");
+                    _logger.Debug("Job is finished");
                     Console.WriteLine();
                     break;
                 case JobState.Canceling:
