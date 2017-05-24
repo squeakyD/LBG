@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,6 +40,12 @@ namespace MediaSvcsIndexer2Demo
                 // Used the cached credentials to create CloudMediaContext.
                 _context = new CloudMediaContext(_cachedCredentials);
 
+                //string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
+                //string src = Path.Combine(_sourceDir, "612026009249280 040417 0932_1191101cut.wav");
+                string src = Path.Combine(_sourceDir, "612026009249955 040417 1028_1191101cut.wav");
+                //string src = Path.Combine(_sourceDir, "612026009250579 040417 1110_1191101cut.wav");
+                //string src = Path.Combine(_sourceDir, "612026009280132 110417_ATJStest1191100.wav");
+
                 if (args.Length > 0)
                 {
                     if (args[0].Equals("delOnly", StringComparison.InvariantCultureIgnoreCase))
@@ -45,29 +53,28 @@ namespace MediaSvcsIndexer2Demo
                         DeleteAssetFiles();
                         return;
                     }
-
-                    if (args[0].Equals("delAfter", StringComparison.InvariantCultureIgnoreCase))
+                    else if (args[0].Equals("delAfter", StringComparison.InvariantCultureIgnoreCase))
                     {
                         _delFiles = true;
                     }
-
-                    if (args[0].Equals("getAssets", StringComparison.InvariantCultureIgnoreCase))
+                    else if (args[0].Equals("getAssets", StringComparison.InvariantCultureIgnoreCase))
                     {
                         GetAllAssetFiles();
                         return;
                     }
+                    else if (args[0].Equals("-f", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        src = Path.Combine(_sourceDir, args[1]);
+                    }
                 }
 
                 // Run indexing job.
-                //string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
-                //string src = Path.Combine(_sourceDir, "612026009249280 040417 0932_1191101cut.wav");
-                //string src = Path.Combine(_sourceDir, "612026009249955 040417 1028_1191101cut.wav");
-                string src = Path.Combine(_sourceDir, "612026009250579 040417 1110_1191101cut.wav");
-                //string src5 = Path.Combine(_sourceDir, "612026009280132 110417_ATJStest1191100.wav");
 
-                _context.NumberOfConcurrentTransfers = 5;
 
-                var asset = RunIndexingJob(src, @"..\..\config.json");
+                //_context.NumberOfConcurrentTransfers = 5;
+
+                var asset = RunIndexingJob(src, @"config.json");
+                //var asset = RunIndexingJob(src, @"indexer1cfg.xml", MediaProcessorNames.AzureMediaIndexer);
 
                 // Download the job output asset.
                 DownloadAsset(asset, _outDir);
@@ -133,10 +140,11 @@ namespace MediaSvcsIndexer2Demo
             _cachedCredentials = new MediaServicesCredentials(accountName, accountKey);
         }
 
-        static IAsset RunIndexingJob(string inputMediaFilePath, string configurationFile)
+        static IAsset RunIndexingJob(string inputMediaFilePath, string configurationFile, string mediaProcessor=MediaProcessorNames.AzureMediaIndexer2Preview)
         {
-            _logger.Information("Running index job for {inputMediaFilePath}", inputMediaFilePath);
             //_logger.Information("Running index job for {inputMediaFilePath}", _sourceDir);
+            _logger.Information("Running index job for {inputMediaFilePath}", inputMediaFilePath);
+            _logger.Information("Using Indexer {mediaProcessor}", mediaProcessor);
 
             // Create an asset and upload the input media file to storage.
             IAsset asset = CreateAssetAndUploadSingleFile(inputMediaFilePath,
@@ -147,13 +155,14 @@ namespace MediaSvcsIndexer2Demo
             //var asset = CreateAssetFromFolder();
 
             _logger.Debug("Creating indexing job");
+
+            var sw = Stopwatch.StartNew();
+
             // Declare a new job.
             IJob job = _context.Jobs.Create("My Indexing Job");
 
-            // Get a reference to Azure Media Indexer 2 Preview.
-
             //var processor = GetLatestMediaProcessorByName(MediaProcessorNames.AzureMediaIndexer2Preview);
-            var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(MediaProcessorNames.AzureMediaIndexer2Preview);
+            var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(mediaProcessor);
 
             // Read configuration from the specified file.
             string configuration = File.ReadAllText(configurationFile);
@@ -165,6 +174,8 @@ namespace MediaSvcsIndexer2Demo
                 TaskOptions.None);
 
             _logger.Debug("Created task {task} for job", task.ToLog());
+
+           //RestoreEncryptionKeys(asset);
 
             // Specify the input asset to be indexed.
             task.InputAssets.Add(asset);
@@ -185,6 +196,8 @@ namespace MediaSvcsIndexer2Demo
 
             progressJobTask.Wait();
 
+            sw.Stop();
+
             // If job state is Error, the event handling
             // method for job progress should log errors.  Here we check
             // for error state and exit if needed.
@@ -194,6 +207,9 @@ namespace MediaSvcsIndexer2Demo
                 _logger.Warning($"Error: {error.Code}. {error.Message}");
                 return null;
             }
+
+            _logger.Information("-> Indexing job for {file} took {elapsed} seconds (processor={processor})", inputMediaFilePath,
+                sw.Elapsed.TotalSeconds, mediaProcessor);
 
             return job.OutputMediaAssets[0];
         }
@@ -217,31 +233,89 @@ namespace MediaSvcsIndexer2Demo
             return asset;
         }
 
-        private static IContentKey _contentKeyForFile = null;
+        private static List<IContentKey> _savedStorageKeys = new List<IContentKey>();
 
         static IAsset CreateAssetAndUploadSingleFile(string filePath, string assetName, AssetCreationOptions options)
         {
             IAsset asset = _context.Assets.Create(assetName, options);
             _logger.Debug("Created asset {asset}", asset.ToLog());
 
-            _contentKeyForFile = asset.ContentKeys.FirstOrDefault();
-
             var assetFile = asset.AssetFiles.Create(Path.GetFileName(filePath));
 
-            string iv=assetFile.InitializationVector;
-            string eid = assetFile.EncryptionKeyId;
-            
             assetFile.Upload(filePath);
             _logger.Information("Uploaded {filePath} to {assetFile}", filePath, assetFile.ToLog());
-            
-            asset.ContentKeys.Clear();
-            asset.Update();
+
+            //RemoveEncryptionKeys(asset);
 
             //var test = asset.ContentKeys;
 
-            _logger.Debug("Removed asset key");
-
             return asset;
+        }
+
+        private static void RemoveEncryptionKeys(IAsset asset)
+        {
+            bool error = false;
+            List<string> KeysListIDs = new List<string>();
+
+            try
+            {
+                var StorageKeys = asset.ContentKeys.Where(k => k.ContentKeyType == ContentKeyType.StorageEncryption).ToList();
+                KeysListIDs = StorageKeys.Select(k => k.Id).ToList(); // create a list of IDs
+                var cks = _context.ContentKeys.ToArray();   // TEST
+
+                // removing key
+                foreach (var key in StorageKeys)
+                {
+                    _savedStorageKeys.Add(key);
+                    asset.ContentKeys.Remove(key);
+                }
+
+                _logger.Debug("Removed {count} asset keys", StorageKeys.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error deleting storage key from asset");
+                error = true;
+            }
+            if (!error)
+            {
+                // deleting key
+                //foreach (var key in _context.ContentKeys.ToList().Where(k => KeysListIDs.Contains(k.Id)).ToList())
+                //{
+                //    try
+                //    {
+                //        key.Delete();
+                //    }
+                //    catch (Exception ex)
+                //    {
+                //        _logger.Error(ex, "Error deleting storage key {id} from CloudMediaContext", key.Id);
+                //    }
+                //}
+            }
+        }
+
+        static string GuidFromId(string id)
+        {
+            string guid = id.Substring(id.IndexOf("UUID:", StringComparison.OrdinalIgnoreCase)+5);
+            return guid;
+        }
+
+        private static void RestoreEncryptionKeys(IAsset asset)
+        {
+            asset.ContentKeys.Clear();
+
+            _savedStorageKeys.ForEach(key =>
+            {
+                _logger.Debug("Adding key {key} to asset {asset} and context", key.Id, asset.ToLog());
+
+                byte[] rawKey = Convert.FromBase64String(key.EncryptedContentKey);
+                Guid keyId=Guid.NewGuid();
+                //_context.ContentKeys.Create(Guid.Parse(GuidFromId(key.Id)), rawKey);//, key.Name, key.ContentKeyType);
+                var newKey= _context.ContentKeys.Create(keyId, rawKey, key.Name, key.ContentKeyType);
+                //asset.ContentKeys[0] = key;
+                                                                                    //var ck = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == key.Id);
+                asset.ContentKeys.Add(newKey);
+            });
         }
 
         static void DownloadAsset(IAsset asset, string outputDirectory)
@@ -281,19 +355,19 @@ namespace MediaSvcsIndexer2Demo
             }
         }
 
-        static IMediaProcessor GetLatestMediaProcessorByName(string mediaProcessorName)
-        {
-            var processor = _context.MediaProcessors
-                .Where(p => p.Name == mediaProcessorName)
-                .ToList()
-                .OrderBy(p => new Version(p.Version))
-                .LastOrDefault();
+        //static IMediaProcessor GetLatestMediaProcessorByName(string mediaProcessorName)
+        //{
+        //    var processor = _context.MediaProcessors
+        //        .Where(p => p.Name == mediaProcessorName)
+        //        .ToList()
+        //        .OrderBy(p => new Version(p.Version))
+        //        .LastOrDefault();
 
-            if (processor == null)
-                throw new ArgumentException($"Unknown media processor - {mediaProcessorName}");
+        //    if (processor == null)
+        //        throw new ArgumentException($"Unknown media processor - {mediaProcessorName}");
 
-            return processor;
-        }
+        //    return processor;
+        //}
 
         private static void StateChanged(object sender, JobStateChangedEventArgs e)
         {

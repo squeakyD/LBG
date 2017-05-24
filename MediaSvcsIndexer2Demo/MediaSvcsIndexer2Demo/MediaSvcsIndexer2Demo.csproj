@@ -129,10 +129,15 @@
     <None Include="App.config">
       <SubType>Designer</SubType>
     </None>
-    <None Include="config.json" />
+    <Content Include="config.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="indexer1Cfg.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="indexerCfg.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
