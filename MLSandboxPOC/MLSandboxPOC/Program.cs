@@ -4,15 +4,13 @@ using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.MediaServices.Client;
-using Microsoft.WindowsAzure.MediaServices.Client.Metadata;
 using Serilog;
 
-namespace MediaSvcsIndexer2Demo
+namespace MLSandboxPOC
 {
     class Program
     {
@@ -113,7 +111,7 @@ namespace MediaSvcsIndexer2Demo
                 else
                 {
                     _logger.Information("Asset {asset} has content key: {key} ", asset.ToLog(),
-                        new {key.ContentKeyType, key.EncryptedContentKey, key.ProtectionKeyId});
+                        new { key.ContentKeyType, key.EncryptedContentKey, key.ProtectionKeyId });
                 }
 
                 foreach (var af in asset.AssetFiles)
@@ -140,7 +138,7 @@ namespace MediaSvcsIndexer2Demo
             _cachedCredentials = new MediaServicesCredentials(accountName, accountKey);
         }
 
-        static IAsset RunIndexingJob(string inputMediaFilePath, string configurationFile, string mediaProcessor=MediaProcessorNames.AzureMediaIndexer2Preview)
+        static IAsset RunIndexingJob(string inputMediaFilePath, string configurationFile, string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
             //_logger.Information("Running index job for {inputMediaFilePath}", _sourceDir);
             _logger.Information("Running index job for {inputMediaFilePath}", inputMediaFilePath);
@@ -151,7 +149,7 @@ namespace MediaSvcsIndexer2Demo
                 "My Indexing Input Asset",
                 //AssetCreationOptions.None);
                 AssetCreationOptions.StorageEncrypted);
-                //AssetCreationOptions.CommonEncryptionProtected);
+            //AssetCreationOptions.CommonEncryptionProtected);
 
             //var asset = CreateAssetFromFolder();
 
@@ -176,7 +174,7 @@ namespace MediaSvcsIndexer2Demo
 
             _logger.Debug("Created task {task} for job", task.ToLog());
 
-           RestoreEncryptionKeys(asset);
+            //RestoreEncryptionKeys(asset);
 
             // Specify the input asset to be indexed.
             task.InputAssets.Add(asset);
@@ -234,7 +232,7 @@ namespace MediaSvcsIndexer2Demo
             return asset;
         }
 
-        private static List<IContentKey> _savedStorageKeys = new List<IContentKey>();
+        //private static List<IContentKey> _savedStorageKeys = new List<IContentKey>();
 
         static IAsset CreateAssetAndUploadSingleFile(string filePath, string assetName, AssetCreationOptions options)
         {
@@ -249,7 +247,7 @@ namespace MediaSvcsIndexer2Demo
             assetFile.Upload(filePath);
             _logger.Information("Uploaded {filePath} to {assetFile}", filePath, assetFile.ToLog());
 
-            RemoveEncryptionKeys(asset);
+            //RemoveEncryptionKeys(asset);
             //RemoveEncryptionKey(asset);
 
             //var test = asset.ContentKeys;
@@ -305,73 +303,73 @@ namespace MediaSvcsIndexer2Demo
         //    asset.ContentKeys.Add(_storedContentKey);
         //}
 
-        private static void RemoveEncryptionKeys(IAsset asset)
-        {
-            bool error = false;
-            List<string> KeysListIDs = new List<string>();
+        //private static void RemoveEncryptionKeys(IAsset asset)
+        //{
+        //    bool error = false;
+        //    List<string> KeysListIDs = new List<string>();
 
-            try
-            {
-                var StorageKeys = asset.ContentKeys.Where(k => k.ContentKeyType == ContentKeyType.StorageEncryption).ToList();
-                KeysListIDs = StorageKeys.Select(k => k.Id).ToList(); // create a list of IDs
-                var cks = _context.ContentKeys.ToArray();   // TEST
+        //    try
+        //    {
+        //        var StorageKeys = asset.ContentKeys.Where(k => k.ContentKeyType == ContentKeyType.StorageEncryption).ToList();
+        //        KeysListIDs = StorageKeys.Select(k => k.Id).ToList(); // create a list of IDs
+        //        var cks = _context.ContentKeys.ToArray();   // TEST
 
-                // removing key
-                foreach (var key in StorageKeys)
-                {
-                    _savedStorageKeys.Add(key);
-                    asset.ContentKeys.Remove(key);
-                }
+        //        // removing key
+        //        foreach (var key in StorageKeys)
+        //        {
+        //            _savedStorageKeys.Add(key);
+        //            asset.ContentKeys.Remove(key);
+        //        }
 
-                _logger.Debug("Removed {count} asset keys", StorageKeys.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error deleting storage key from asset");
-                error = true;
-            }
-            if (!error)
-            {
-                // deleting key
-                foreach (var key in _context.ContentKeys.ToList().Where(k => KeysListIDs.Contains(k.Id)).ToList())
-                {
-                    try
-                    {
-                        key.Delete();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error(ex, "Error deleting storage key {id} from CloudMediaContext", key.Id);
-                    }
-                }
-            }
-        }
+        //        _logger.Debug("Removed {count} asset keys", StorageKeys.Count);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error(ex, "Error deleting storage key from asset");
+        //        error = true;
+        //    }
+        //    if (!error)
+        //    {
+        //        // deleting key
+        //        foreach (var key in _context.ContentKeys.ToList().Where(k => KeysListIDs.Contains(k.Id)).ToList())
+        //        {
+        //            try
+        //            {
+        //                key.Delete();
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                _logger.Error(ex, "Error deleting storage key {id} from CloudMediaContext", key.Id);
+        //            }
+        //        }
+        //    }
+        //}
 
         static string GuidFromId(string id)
         {
-            string guid = id.Substring(id.IndexOf("UUID:", StringComparison.OrdinalIgnoreCase)+5);
+            string guid = id.Substring(id.IndexOf("UUID:", StringComparison.OrdinalIgnoreCase) + 5);
             return guid;
         }
 
-        private static void RestoreEncryptionKeys(IAsset asset)
-        {
-            //asset.ContentKeys.Clear();
+        //private static void RestoreEncryptionKeys(IAsset asset)
+        //{
+        //    //asset.ContentKeys.Clear();
 
-            _savedStorageKeys.ForEach(key =>
-            {
-                _logger.Debug("Adding key {key} to asset {asset} and context", key.Id, asset.ToLog());
-                
-                //byte[] rawKey = Convert.FromBase64String(key.EncryptedContentKey);
-                //Guid keyId = Guid.NewGuid();
-                //_context.ContentKeys.Create(Guid.Parse(GuidFromId(key.Id)), rawKey);//, key.Name, key.ContentKeyType);
-                //var newKey= _context.ContentKeys.Create(keyId, rawKey, key.Name, key.ContentKeyType);
-                var newKey = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
-                //newKey.EncryptedContentKey
-                //asset.ContentKeys[0] = key;
-                //var ck = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == key.Id);
-                asset.ContentKeys.Add(newKey);
-            });
-        }
+        //    _savedStorageKeys.ForEach(key =>
+        //    {
+        //        _logger.Debug("Adding key {key} to asset {asset} and context", key.Id, asset.ToLog());
+
+        //        //byte[] rawKey = Convert.FromBase64String(key.EncryptedContentKey);
+        //        //Guid keyId = Guid.NewGuid();
+        //        //_context.ContentKeys.Create(Guid.Parse(GuidFromId(key.Id)), rawKey);//, key.Name, key.ContentKeyType);
+        //        //var newKey= _context.ContentKeys.Create(keyId, rawKey, key.Name, key.ContentKeyType);
+        //        var newKey = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+        //        //newKey.EncryptedContentKey
+        //        //asset.ContentKeys[0] = key;
+        //        //var ck = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == key.Id);
+        //        asset.ContentKeys.Add(newKey);
+        //    });
+        //}
 
         static void DownloadAsset(IAsset asset, string outputDirectory)
         {
@@ -410,20 +408,6 @@ namespace MediaSvcsIndexer2Demo
             }
         }
 
-        //static IMediaProcessor GetLatestMediaProcessorByName(string mediaProcessorName)
-        //{
-        //    var processor = _context.MediaProcessors
-        //        .Where(p => p.Name == mediaProcessorName)
-        //        .ToList()
-        //        .OrderBy(p => new Version(p.Version))
-        //        .LastOrDefault();
-
-        //    if (processor == null)
-        //        throw new ArgumentException($"Unknown media processor - {mediaProcessorName}");
-
-        //    return processor;
-        //}
-
         private static void StateChanged(object sender, JobStateChangedEventArgs e)
         {
             Console.WriteLine("Job state changed event:");
@@ -447,8 +431,6 @@ namespace MediaSvcsIndexer2Demo
                     break;
                 case JobState.Canceled:
                 case JobState.Error:
-                    // Cast sender as a job.
-                    //IJob job = (IJob)sender;
                     // Display or log error details as needed.
                     // LogJobStop(job.Id);
                     _logger.Error("{job} job {CurrentState}", job.ToLog(), e.CurrentState);
@@ -458,6 +440,5 @@ namespace MediaSvcsIndexer2Demo
             }
         }
     }
-
 
 }

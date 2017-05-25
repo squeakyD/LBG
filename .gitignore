@@ -287,3 +287,4 @@ __pycache__/
 *.odx.cs
 *.xsd.cs
 /MediaSvcsIndexer2Demo/MediaSvcsIndexer2Demo/azure.cfg
+/MLSandboxPOC/MLSandboxPOC/azure.cfg
