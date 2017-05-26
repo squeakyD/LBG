@@ -13,11 +13,10 @@ namespace MLSandboxPOC
                 .CreateLogger();
         }
 
-        public static ILogger GetLog<T>()
+        public static ILogger GetLog<T>() where T : class
         {
             // Per class logger
             return Log.Logger.ForContext<T>();
         }
-        
     }
 }

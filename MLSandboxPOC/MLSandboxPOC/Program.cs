@@ -4,10 +4,14 @@ using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Security.Policy;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.MediaServices.Client;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Serilog;
 
 namespace MLSandboxPOC
@@ -26,6 +30,7 @@ namespace MLSandboxPOC
         private static bool _delFiles;
 
         private static ILogger _logger;
+        private static MSRestClient _restClient;
 
         static void Main(string[] args)
         {
@@ -65,6 +70,8 @@ namespace MLSandboxPOC
                         src = Path.Combine(_sourceDir, args[1]);
                     }
                 }
+
+                _restClient = new MSRestClient(_cachedCredentials);
 
                 // Run indexing job.
 
@@ -174,6 +181,7 @@ namespace MLSandboxPOC
 
             _logger.Debug("Created task {task} for job", task.ToLog());
 
+            RestoreEncryptionKey(asset);
             //RestoreEncryptionKeys(asset);
 
             // Specify the input asset to be indexed.
@@ -248,14 +256,14 @@ namespace MLSandboxPOC
             _logger.Information("Uploaded {filePath} to {assetFile}", filePath, assetFile.ToLog());
 
             //RemoveEncryptionKeys(asset);
-            //RemoveEncryptionKey(asset);
+            RemoveEncryptionKey(asset);
 
             //var test = asset.ContentKeys;
 
             return asset;
         }
 
-        //private static IContentKey _storedContentKey;
+        private static IContentKey _storedContentKey;
 
         //static IContentKey CreateCommonTypeContentKey(IAsset asset)
         //{
@@ -289,20 +297,59 @@ namespace MLSandboxPOC
         //    return returnValue;
         //}
 
-        //private static void RemoveEncryptionKey(IAsset asset)
-        //{
-        //    asset.ContentKeys.Remove(_storedContentKey);
-        //    asset.Update();
-        //    //var key=_context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == _storedContentKey.Id);
-        //    //key.Delete();
-        //    _logger.Debug("Removed encryption key {key} from asset {asset}",_storedContentKey.Id, asset.ToLog());
-        //}
+        private static void RemoveEncryptionKey(IAsset asset)
+        {
+            _storedContentKey = asset.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+            asset.ContentKeys.Remove(_storedContentKey);
+            asset.Update();
+            //    //var key=_context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == _storedContentKey.Id);
+            //    //key.Delete();
+            //    _logger.Debug("Removed encryption key {key} from asset {asset}",_storedContentKey.Id, asset.ToLog());
+        }
 
-        //private static void RestoreEncryptionKey(IAsset asset)
-        //{
-        //    asset.ContentKeys.Add(_storedContentKey);
-        //}
+        class MyContentKey
+        {
+            //public string Id { get;set;  }
+            public string Name { get; set; }
+            public string ProtectionKeyId { get; set; }
+            public int ContentKeyType { get; set; }
+            public int ProtectionKeyType { get; set; }
+            public string EncryptedContentKey { get; set; }
+            public string Checksum { get; set; }
+        }
 
+        private static void RestoreEncryptionKey(IAsset asset)
+        {
+            //asset.ContentKeys.Add(_storedContentKey);
+             var newKey = new MyContentKey
+            {
+                Name = _storedContentKey.Name,
+                ProtectionKeyId = _storedContentKey.ProtectionKeyId,
+                ContentKeyType = (int) _storedContentKey.ContentKeyType,
+                ProtectionKeyType=(int)_storedContentKey.ProtectionKeyType,
+                EncryptedContentKey = _storedContentKey.EncryptedContentKey,
+                Checksum = _storedContentKey.Checksum
+            };
+
+            string keyResp = _restClient.MakeAPICall("ContentKeys", JsonConvert.SerializeObject(newKey));
+
+            if (!string.IsNullOrEmpty(keyResp))
+            {
+                JObject obj = JObject.Parse(keyResp);
+
+                string keyId = obj["Id"].ToString();
+
+                string addKeyCommand = $"Assets('{Uri.EscapeDataString(asset.Id)}')/$links/ContentKeys";
+
+               string body = JsonConvert.SerializeObject(new {uri=$"{_restClient.ApiUrl}/ContentKeys('{Uri.EscapeDataString(keyId)}')" });
+
+                // TODO: Add extra headers
+                string addKeyResp = _restClient.MakeAPICall(addKeyCommand, body);
+
+            }
+        }
+
+        
         //private static void RemoveEncryptionKeys(IAsset asset)
         //{
         //    bool error = false;
@@ -369,7 +416,8 @@ namespace MLSandboxPOC
         //        //var ck = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == key.Id);
         //        asset.ContentKeys.Add(newKey);
         //    });
-        //}
+        //}            
+
 
         static void DownloadAsset(IAsset asset, string outputDirectory)
         {
