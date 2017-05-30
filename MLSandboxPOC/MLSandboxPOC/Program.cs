@@ -31,6 +31,7 @@ namespace MLSandboxPOC
 
         private static ILogger _logger;
         private static MSRestClient _restClient;
+        private static DownloadManager _downloadManager;
 
         static void Main(string[] args)
         {
@@ -72,6 +73,7 @@ namespace MLSandboxPOC
                 }
 
                 _restClient = new MSRestClient(_cachedCredentials);
+                _downloadManager = new DownloadManager(_context, _outDir);
 
                 // Run indexing job.
 
@@ -82,8 +84,9 @@ namespace MLSandboxPOC
                 //var asset = RunIndexingJob(src, @"indexer1cfg.xml", MediaProcessorNames.AzureMediaIndexer);
 
                 // Download the job output asset.
-                DownloadAsset(asset, _outDir);
-
+                //DownloadAsset(asset, _outDir);
+                _downloadManager.QueueAsset(asset);
+                _downloadManager.WaitForAllTasks();
                 //foreach (var s in new[] {src,src2,src3,src4,src5})
                 //{
                 //    var asset = RunIndexingJob(src, @"..\..\config.json");
@@ -121,7 +124,7 @@ namespace MLSandboxPOC
                         new { key.ContentKeyType, key.EncryptedContentKey, key.ProtectionKeyId });
                 }
 
-                foreach (var af in asset.AssetFiles)
+                foreach (var af in asset.AssetFiles)    
                 {
                     _logger.Information("   Asset has file {file}", af.ToLog());
                 }
@@ -147,78 +150,77 @@ namespace MLSandboxPOC
 
         static IAsset RunIndexingJob(string inputMediaFilePath, string configurationFile, string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
-            //_logger.Information("Running index job for {inputMediaFilePath}", _sourceDir);
-            _logger.Information("Running index job for {inputMediaFilePath}", inputMediaFilePath);
-            _logger.Information("Using Indexer {mediaProcessor}", mediaProcessor);
+            ////_logger.Information("Running index job for {inputMediaFilePath}", _sourceDir);
+            //_logger.Information("Running index job for {inputMediaFilePath}", inputMediaFilePath);
+            //_logger.Information("Using Indexer {mediaProcessor}", mediaProcessor);
 
-            // Create an asset and upload the input media file to storage.
-            IAsset asset = CreateAssetAndUploadSingleFile(inputMediaFilePath,
-                "My Indexing Input Asset",
-                //AssetCreationOptions.None);
-                AssetCreationOptions.StorageEncrypted);
-            //AssetCreationOptions.CommonEncryptionProtected);
+            //// Create an asset and upload the input media file to storage.
+            //IAsset asset = CreateAssetAndUploadSingleFile(inputMediaFilePath,
+            //    "My Indexing Input Asset",
+            //    //AssetCreationOptions.None);
+            //    AssetCreationOptions.StorageEncrypted);
 
-            //var asset = CreateAssetFromFolder();
+            ////var asset = CreateAssetFromFolder();
 
-            _logger.Debug("Creating indexing job");
+            //_logger.Debug("Creating indexing job");
 
-            var sw = Stopwatch.StartNew();
+            //// Declare a new job.
+            //IJob job = _context.Jobs.Create("My Indexing Job");
 
-            // Declare a new job.
-            IJob job = _context.Jobs.Create("My Indexing Job");
-
-            //var processor = GetLatestMediaProcessorByName(MediaProcessorNames.AzureMediaIndexer2Preview);
-            var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(mediaProcessor);
+            ////var processor = GetLatestMediaProcessorByName(MediaProcessorNames.AzureMediaIndexer2Preview);
+            //var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(mediaProcessor);
 
             // Read configuration from the specified file.
             string configuration = File.ReadAllText(configurationFile);
 
-            // Create a task with the encoding details, using a string preset.
-            ITask task = job.Tasks.AddNew("My Indexing Task",
-                processor,
-                configuration,
-                TaskOptions.None);
+            var job = new IndexingJob(_context, inputMediaFilePath, configuration);
+            return job.Run();
 
-            _logger.Debug("Created task {task} for job", task.ToLog());
+            //// Create a task with the encoding details, using a string preset.
+            //ITask task = job.Tasks.AddNew("My Indexing Task",
+            //    processor,
+            //    configuration,
+            //    TaskOptions.None);
 
-            RestoreEncryptionKey(asset);
-            //RestoreEncryptionKeys(asset);
+            //_logger.Debug("Created task {task} for job", task.ToLog());
 
-            // Specify the input asset to be indexed.
-            task.InputAssets.Add(asset);
+            ////RestoreEncryptionKey(asset);
+            ////RestoreEncryptionKeys(asset);
 
-            // Add an output asset to contain the results of the job.
-            task.OutputAssets.AddNew("My Indexing Output Asset", AssetCreationOptions.StorageEncrypted);
+            //// Specify the input asset to be indexed.
+            //task.InputAssets.Add(asset);
 
-            // Use the following event handler to check job progress.  
-            job.StateChanged += new EventHandler<JobStateChangedEventArgs>(StateChanged);
+            //// Add an output asset to contain the results of the job.
+            //task.OutputAssets.AddNew("My Indexing Output Asset", AssetCreationOptions.StorageEncrypted);
 
-            _logger.Information("Submitted job {job}", job.ToLog());
+            //// Use the following event handler to check job progress.  
+            //job.StateChanged += new EventHandler<JobStateChangedEventArgs>(StateChanged);
 
-            // Launch the job.
-            job.Submit();
+            //_logger.Information("Submitted job {job}", job.ToLog());
 
-            // Check job execution and wait for job to finish.
-            Task progressJobTask = job.GetExecutionProgressTask(CancellationToken.None);
+            //// Launch the job.
+            //job.Submit();
 
-            progressJobTask.Wait();
+            //// Check job execution and wait for job to finish.
+            //Task progressJobTask = job.GetExecutionProgressTask(CancellationToken.None);
 
-            sw.Stop();
+            //progressJobTask.Wait();
 
-            // If job state is Error, the event handling
-            // method for job progress should log errors.  Here we check
-            // for error state and exit if needed.
-            if (job.State == JobState.Error)
-            {
-                ErrorDetail error = job.Tasks.First().ErrorDetails.First();
-                _logger.Warning($"Error: {error.Code}. {error.Message}");
-                return null;
-            }
+            //// If job state is Error, the event handling
+            //// method for job progress should log errors.  Here we check
+            //// for error state and exit if needed.
+            //if (job.State == JobState.Error)
+            //{
+            //    ErrorDetail error = job.Tasks.First().ErrorDetails.First();
+            //    _logger.Warning($"Error: {error.Code}. {error.Message}");
+            //    return null;
+            //}
+            //var elapsed = job.EndTime - job.StartTime;
 
-            _logger.Information("-> Indexing job for {file} took {elapsed} seconds (processor={processor})", inputMediaFilePath,
-                sw.Elapsed.TotalSeconds, mediaProcessor);
+            //_logger.Information("-> Indexing job for {file} took {elapsed} seconds (processor={processor})", inputMediaFilePath,
+            //    elapsed?.Seconds ?? 0, mediaProcessor);
 
-            return job.OutputMediaAssets[0];
+            //return job.OutputMediaAssets[0];
         }
 
         private static IAsset CreateAssetFromFolder()
@@ -299,6 +301,7 @@ namespace MLSandboxPOC
 
         private static void RemoveEncryptionKey(IAsset asset)
         {
+            return; // temp
             _storedContentKey = asset.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
             asset.ContentKeys.Remove(_storedContentKey);
             asset.Update();
@@ -320,13 +323,15 @@ namespace MLSandboxPOC
 
         private static void RestoreEncryptionKey(IAsset asset)
         {
+            return; // temp
             //asset.ContentKeys.Add(_storedContentKey);
-             var newKey = new MyContentKey
+            _logger.Debug("RestoreEncryptionKey: asset {asset}", asset.ToLog());
+            var newKey = new MyContentKey
             {
                 Name = _storedContentKey.Name,
                 ProtectionKeyId = _storedContentKey.ProtectionKeyId,
                 ContentKeyType = (int) _storedContentKey.ContentKeyType,
-                ProtectionKeyType=(int)_storedContentKey.ProtectionKeyType,
+                ProtectionKeyType = (int) _storedContentKey.ProtectionKeyType,
                 EncryptedContentKey = _storedContentKey.EncryptedContentKey,
                 Checksum = _storedContentKey.Checksum
             };
@@ -341,14 +346,22 @@ namespace MLSandboxPOC
 
                 string addKeyCommand = $"Assets('{Uri.EscapeDataString(asset.Id)}')/$links/ContentKeys";
 
-               string body = JsonConvert.SerializeObject(new {uri=$"{_restClient.ApiUrl}/ContentKeys('{Uri.EscapeDataString(keyId)}')" });
+                string body = JsonConvert.SerializeObject(new {uri = $"{_restClient.ApiUrl}/ContentKeys('{Uri.EscapeDataString(keyId)}')"});
 
+                // DataServiceVersion: 1.0;NetFx
+                // MaxDataServiceVersion: 3.0; NetFx
                 // TODO: Add extra headers
-                string addKeyResp = _restClient.MakeAPICall(addKeyCommand, body);
+                var customHdrs = new Dictionary<string, string>
+                {
+                    ["DataServiceVersion"] = "1.0;NetFx",
+                    ["MaxDataServiceVersion"] = "3.0; NetFx"
+                };
+                string addKeyResp = _restClient.MakeAPICall(addKeyCommand, body, customHdrs);
 
+                //var key=asset.ContentKeys.AsEnumerable().FirstOrDefault(k=>k.Id== _storedContentKey.Id);// .Add();
             }
         }
-
+    
         
         //private static void RemoveEncryptionKeys(IAsset asset)
         //{
@@ -460,7 +473,8 @@ namespace MLSandboxPOC
         {
             Console.WriteLine("Job state changed event:");
             Console.WriteLine("  Previous state: " + e.PreviousState);
-            Console.WriteLine("  Current state: " + e.CurrentState);
+            //Console.WriteLine("  Current state: " + e.CurrentState);
+            _logger.Debug("  Current state: " + e.CurrentState);
             IJob job = (IJob)sender;
 
             switch (e.CurrentState)
@@ -473,7 +487,13 @@ namespace MLSandboxPOC
                     break;
                 case JobState.Canceling:
                 case JobState.Queued:
+                    Console.WriteLine("Please wait...");
+                    break;
                 case JobState.Scheduled:
+                    var asset = job.InputMediaAssets.FirstOrDefault();
+                    RestoreEncryptionKey(asset);
+                    Console.WriteLine("Please wait...");
+                    break;
                 case JobState.Processing:
                     Console.WriteLine("Please wait...");
                     break;
