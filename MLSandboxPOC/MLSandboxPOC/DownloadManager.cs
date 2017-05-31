@@ -23,7 +23,7 @@ namespace MLSandboxPOC
         private readonly List<Task> _currentTasks = new List<Task>();
         private readonly Timer _timer;
 
-        private readonly BlobTransferClient _blobClient = new BlobTransferClient();
+        //private readonly BlobTransferClient _blobClient = new BlobTransferClient();
 
         public DownloadManager(CloudMediaContext context, string outputDirectory, int interval = 30, bool deleteFiles = true)
         {
@@ -48,9 +48,7 @@ namespace MLSandboxPOC
                 return;
             }
 
-            //int numTasks = Math.Min(_blobClient.NumberOfConcurrentTransfers, Math.Max(_runningTasks, _assets.Count));
-
-            while (_currentTasks.Count < _blobClient.NumberOfConcurrentTransfers)
+            while (_currentTasks.Count < _context.NumberOfConcurrentTransfers && _assets.Count > 0)
             {
                 var assetToDownload = _assets.Dequeue();
                 //++_runningTasks;
@@ -66,6 +64,30 @@ namespace MLSandboxPOC
         public void WaitForAllTasks()
         {
             _logger.Information("Waiting for all outstanding downloads to complete");
+
+            //_currentTasks.Add(Task.Run(() =>
+            //{
+            int numAssets = 0;
+            //Interlocked.Exchange(ref numAssets, _assets.Count);
+            numAssets = _assets.Count;
+
+            int oldNumAssets = numAssets + 1;
+
+            while (numAssets > 0)
+            {
+                if (numAssets != oldNumAssets)
+                {
+                    _logger.Information("Waiting for {n} assets to be processed ...", numAssets);
+                    oldNumAssets = numAssets;
+                }
+                Thread.Sleep(2000);
+
+                //Interlocked.Exchange(ref numAssets, _assets.Count);
+                numAssets = _assets.Count;
+            }
+            //}));
+
+            _logger.Debug("Waiting for remaining download tasks");
             Task.WaitAll(_currentTasks.ToArray());
         }
 
@@ -73,32 +95,42 @@ namespace MLSandboxPOC
         {
             _logger.Information("Downloading files from asset {asset}", asset.ToLog());
 
-            List<Task> tasks=new List<Task>();
-
-            foreach (IAssetFile file in asset.AssetFiles)
+            try
             {
-                var task = Task.Run(async () =>
+                //List<Task> tasks = new List<Task>();
+
+                foreach (IAssetFile file in asset.AssetFiles)
                 {
+                    //var task = Task.Run(async () =>
+                    //{
                     _logger.Information("Downloading {file}", file.ToLog());
 
-                    await file.DownloadAsync(Path.Combine(_outputDirectory, file.Name), _blobClient, asset.Locators[0], CancellationToken.None);
+                    //await file.DownloadAsync(Path.Combine(_outputDirectory, file.Name), _blobClient, asset.Locators[0], CancellationToken.None);
+                    file.Download(Path.Combine(_outputDirectory, file.Name));
 
                     if (_deleteFiles)
                     {
                         _logger.Debug("Deleting output file {file} in asset {asset}", file.ToLog(), asset.ToLog());
-                        await file.DeleteAsync();
+                        //await file.DeleteAsync();
+                        file.Delete();
                     }
-                });
+                    //});
+                    //
+                    //tasks.Add(task);
+                }
 
-                tasks.Add(task);
+                //// TODO: try/catch here - https://msdn.microsoft.com/en-us/library/dd537614(v=vs.110).aspx
+                //Task.WaitAll(tasks.ToArray());
+
+                if (_deleteFiles)
+                {
+                    _logger.Debug("Deleting output asset {asset}", asset.ToLog());
+                    await asset.DeleteAsync();
+                }
             }
-
-            Task.WaitAll(tasks.ToArray());
-
-            if (_deleteFiles)
+            catch(Exception ex)
             {
-                _logger.Debug("Deleting output asset {asset}", asset.ToLog());
-                await asset.DeleteAsync();
+                _logger.Error(ex, "Error occurred downloading files from asset {asset}", asset.ToLog()); 
             }
         }
     }

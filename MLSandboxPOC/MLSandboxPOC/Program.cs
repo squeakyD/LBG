@@ -45,8 +45,9 @@ namespace MLSandboxPOC
                 _context = new CloudMediaContext(_cachedCredentials);
 
                 //string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
+                string src = Path.Combine(_sourceDir, "612026009249280 040417_shortened.wav");
                 //string src = Path.Combine(_sourceDir, "612026009249280 040417 0932_1191101cut.wav");
-                string src = Path.Combine(_sourceDir, "612026009249955 040417 1028_1191101cut.wav");
+                //string src = Path.Combine(_sourceDir, "612026009249955 040417 1028_1191101cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009250579 040417 1110_1191101cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009280132 110417_ATJStest1191100.wav");
 

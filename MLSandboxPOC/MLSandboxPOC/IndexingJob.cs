@@ -18,7 +18,7 @@ namespace MLSandboxPOC
         private readonly string _configuration;
         private readonly string _mediaProcessor;
         private IContentKey _storedContentKey;
-        private IAccessPolicy _accessPolicy;
+        //private IAccessPolicy _accessPolicy;
 
         public IndexingJob(CloudMediaContext context, string filePath, string configuration,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
@@ -33,8 +33,6 @@ namespace MLSandboxPOC
         public IAsset Run()
         {
             _logger.Information("Running index job for {file}, using  Indexer {mediaProcessor}", _filePath, _mediaProcessor);
-
-            _accessPolicy = _context.AccessPolicies.Create("MyPol", TimeSpan.FromMinutes(20), AccessPermissions.Write);
 
             IAsset asset = CreateAssetAndUploadSingleFile(AssetCreationOptions.StorageEncrypted);
 
@@ -55,7 +53,7 @@ namespace MLSandboxPOC
             // Add an output asset to contain the results of the job.
             task.OutputAssets.AddNew($"Indexing Output Asset:{_filePath}", AssetCreationOptions.StorageEncrypted);
 
-            job.StateChanged += new EventHandler<JobStateChangedEventArgs>(StateChanged);
+            job.StateChanged += StateChanged;
             job.Submit();
 
             // Check job execution and wait for job to finish.
@@ -76,9 +74,9 @@ namespace MLSandboxPOC
             var elapsed = job.EndTime - job.StartTime;
 
             _logger.Information("-> Indexing job for {file} took {elapsed} seconds (processor={processor})",
-                _filePath, elapsed?.Seconds ?? 0, _mediaProcessor);
+                _filePath, elapsed?.TotalSeconds ?? 0, _mediaProcessor);
 
-            _context.Locators.CreateLocator(LocatorType.Sas, job.OutputMediaAssets[0], _accessPolicy);
+            //_context.Locators.CreateLocator(LocatorType.Sas, job.OutputMediaAssets[0], _accessPolicy);
 
             return job.OutputMediaAssets[0];
         }
@@ -92,7 +90,6 @@ namespace MLSandboxPOC
             //RemoveEncryptionKey(asset);
 
             //var test = asset.ContentKeys;
-            //_context.Locators.CreateLocator(LocatorType.Sas, asset, _accessPolicy);
             return asset;
         }
 
