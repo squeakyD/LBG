@@ -12,7 +12,7 @@ using Timer = System.Timers.Timer;
 
 namespace MLSandboxPOC
 {
-    class DownloadManager
+    class DownloadManager: IManager<IAsset>
     {
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
@@ -56,7 +56,7 @@ namespace MLSandboxPOC
             }
         }
 
-        public void QueueAsset(IAsset asset)
+        public void QueueItem(IAsset asset)
         {
             _assets.Enqueue(asset);
         }

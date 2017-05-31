@@ -172,8 +172,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ContentKeyExtensions.cs" />
     <Compile Include="DownloadManager.cs" />
     <Compile Include="IndexingJob.cs" />
+    <Compile Include="IndexingJobManager.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="LoggerExtensions.cs" />
     <Compile Include="MSRestClient.cs" />

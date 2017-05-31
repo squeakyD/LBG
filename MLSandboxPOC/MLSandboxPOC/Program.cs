@@ -86,7 +86,7 @@ namespace MLSandboxPOC
 
                 // Download the job output asset.
                 //DownloadAsset(asset, _outDir);
-                _downloadManager.QueueAsset(asset);
+                _downloadManager.QueueItem(asset);
                 _downloadManager.WaitForAllTasks();
                 //foreach (var s in new[] {src,src2,src3,src4,src5})
                 //{
