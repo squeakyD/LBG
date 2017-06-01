@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Timer = System.Timers.Timer;
 
@@ -30,8 +31,9 @@ namespace MLSandboxPOC
         private IManager<IAsset> _downloadManager;
 
         private readonly Queue<string> _fileNames = new Queue<string>();
-        private readonly List<Task<IAsset>> _currentTasks = new List<Task<IAsset>>();
-        private Task _checkJobs;
+        //private readonly List<Task<IAsset>> _currentTasks = new List<Task<IAsset>>();
+        private readonly List<Task> _currentTasks = new List<Task>();
+        //private Task _checkJobs;
         private readonly Timer _timer;
 
         public IndexingJobManager(CloudMediaContext context, string configuration,
@@ -55,15 +57,10 @@ namespace MLSandboxPOC
             //_checkJobs = Task.Run(()=>);
         }
 
+        public List<string> UnprocessedFiles => new List<string>();
+
         private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            Task.WhenAny(_currentTasks.ToArray())
-                 .ContinueWith(t =>
-                 {
-                     _logger.Information("Finished indexer job, queuing asset {asset} for download", t.Result.Result.ToLog());
-                     _downloadManager.QueueItem(t.Result.Result);
-                 });
-
             _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
 
             if (_fileNames.Count == 0)
@@ -83,20 +80,80 @@ namespace MLSandboxPOC
             _fileNames.Enqueue(fileName);
         }
 
-        public void WaitForAllTasks()
-        {
-            _logger.Information("Waiting for all outstanding indexing jobs to complete");
-        }
+        //public void WaitForAllTasks()
+        //{
+        //    _logger.Information("Waiting for all outstanding indexing jobs to complete");
+        //    int numItems = 0;
 
-        private Task<IAsset> RunJob(string fileName)
+        //    numItems = _fileNames.Count;
+
+        //    int oldNumItems = numItems + 1;
+        //    while (numItems > 0)
+        //    {
+        //        if (numItems != oldNumItems)
+        //        {
+        //            _logger.Information("Waiting for {n} files to be processed ...", numItems);
+        //            oldNumItems = numItems;
+        //        }
+        //        Thread.Sleep(2000);
+
+        //        numItems = _fileNames.Count;
+        //    }
+
+        //    _logger.Debug("Waiting for remaining indexing tasks");
+        //    Task.WaitAll(_currentTasks.ToArray());
+        //}
+
+        public Task WaitForAllTasks()
         {
             return Task.Run(() =>
             {
-                var job = new IndexingJob(_context, fileName, _configuration);
-                return job.Run();
-            }
-            );
+                _logger.Information("Waiting for all outstanding indexing jobs to complete");
+                int numItems = 0;
 
+                numItems = _fileNames.Count;
+
+                int oldNumItems = numItems + 1;
+                while (numItems > 0)
+                {
+                    if (numItems != oldNumItems)
+                    {
+                        _logger.Information("Waiting for {n} files to be processed ...", numItems);
+                        oldNumItems = numItems;
+                    }
+                    Thread.Sleep(1000);
+
+                    numItems = _fileNames.Count;
+                }
+
+                _logger.Debug("Waiting for remaining indexing tasks");
+                Task.WaitAll(_currentTasks.ToArray());
+            });
+        }
+
+        //private Task<IAsset> RunJob(string fileName)
+        private Task RunJob(string fileName)
+        {
+            return Task.Run(() =>
+                {
+                    var job = new IndexingJob(_context, fileName, _configuration);
+                    try
+                    {
+                        var outputAsset = job.Run();
+                        _downloadManager.QueueItem(outputAsset);
+                    }
+                    catch (Exception ex)
+                    {
+                        // In the event of an error, abort this job, but catch the exception so that other jobs can complete
+                        UnprocessedFiles.Add(fileName);
+                        _logger.Error(ex, "Error uploading/indexing {file}", fileName);
+                    }
+                    finally
+                    {
+                        job.DeleteAsset();
+                    }
+                }
+            );
         }
     }
 }

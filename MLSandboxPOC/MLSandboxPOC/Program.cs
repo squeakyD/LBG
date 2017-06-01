@@ -31,6 +31,7 @@ namespace MLSandboxPOC
 
         private static ILogger _logger;
         private static MSRestClient _restClient;
+        private static IndexingJobManager _indexingJobManager;
         private static DownloadManager _downloadManager;
 
         static void Main(string[] args)
@@ -45,7 +46,8 @@ namespace MLSandboxPOC
                 _context = new CloudMediaContext(_cachedCredentials);
 
                 //string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
-                string src = Path.Combine(_sourceDir, "612026009249280 040417_shortened.wav");
+                string src = Path.Combine(_sourceDir, "612026009249280 040417_1.wav");
+                string src2 = Path.Combine(_sourceDir, "612026009249280 040417_2.wav");
                 //string src = Path.Combine(_sourceDir, "612026009249280 040417 0932_1191101cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009249955 040417 1028_1191101cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009250579 040417 1110_1191101cut.wav");
@@ -74,20 +76,29 @@ namespace MLSandboxPOC
                 }
 
                 _restClient = new MSRestClient(_cachedCredentials);
+
                 _downloadManager = new DownloadManager(_context, _outDir);
+                string configuration = File.ReadAllText("config.json");
+                _indexingJobManager = new IndexingJobManager(_context, configuration, _downloadManager);
 
                 // Run indexing job.
+                _indexingJobManager.QueueItem(src);
+                _indexingJobManager.QueueItem(src2);
+                _context.NumberOfConcurrentTransfers = 25;
 
-
-                //_context.NumberOfConcurrentTransfers = 5;
-
-                var asset = RunIndexingJob(src, @"config.json");
+                //var asset = RunIndexingJob(src, @"config.json");
                 //var asset = RunIndexingJob(src, @"indexer1cfg.xml", MediaProcessorNames.AzureMediaIndexer);
 
                 // Download the job output asset.
                 //DownloadAsset(asset, _outDir);
-                _downloadManager.QueueItem(asset);
-                _downloadManager.WaitForAllTasks();
+                //_downloadManager.QueueItem(asset);
+
+                var t1 =_indexingJobManager.WaitForAllTasks();
+                t1.Wait();
+                var t2 = _downloadManager.WaitForAllTasks();
+                t2.Wait();
+                //Task.WaitAll(t1, t2);
+
                 //foreach (var s in new[] {src,src2,src3,src4,src5})
                 //{
                 //    var asset = RunIndexingJob(src, @"..\..\config.json");

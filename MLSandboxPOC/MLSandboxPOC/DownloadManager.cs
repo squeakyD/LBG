@@ -30,7 +30,7 @@ namespace MLSandboxPOC
             _context = context;
             _outputDirectory = outputDirectory;
             _deleteFiles = deleteFiles;
-            _logger = Logger.GetLog<IndexingJob>();
+            _logger = Logger.GetLog<DownloadManager>();
 
             _timer = new Timer(interval);
             _timer.Elapsed += _timer_Elapsed;
@@ -58,37 +58,67 @@ namespace MLSandboxPOC
 
         public void QueueItem(IAsset asset)
         {
+            _logger.Debug("QueueItem");
             _assets.Enqueue(asset);
         }
 
-        public void WaitForAllTasks()
+        //public void WaitForAllTasks()
+        //{
+        //    _logger.Information("Waiting for all outstanding downloads to complete");
+
+        //    //_currentTasks.Add(Task.Run(() =>
+        //    //{
+        //    int numItems = 0;
+        //    //Interlocked.Exchange(ref numAssets, _assets.Count);
+        //    numItems = _assets.Count;
+
+        //    int oldNumItems = numItems + 1;
+
+        //    while (numItems > 0)
+        //    {
+        //        if (numItems != oldNumItems)
+        //        {
+        //            _logger.Information("Waiting for {n} assets to be processed ...", numItems);
+        //            oldNumItems = numItems;
+        //        }
+        //        Thread.Sleep(2000);
+
+        //        //Interlocked.Exchange(ref numAssets, _assets.Count);
+        //        numItems = _assets.Count;
+        //    }
+        //    //}));
+
+        //    _logger.Debug("Waiting for remaining download tasks");
+        //    Task.WaitAll(_currentTasks.ToArray());
+        //}
+        public Task WaitForAllTasks()
         {
-            _logger.Information("Waiting for all outstanding downloads to complete");
-
-            //_currentTasks.Add(Task.Run(() =>
-            //{
-            int numAssets = 0;
-            //Interlocked.Exchange(ref numAssets, _assets.Count);
-            numAssets = _assets.Count;
-
-            int oldNumAssets = numAssets + 1;
-
-            while (numAssets > 0)
+            return Task.Run(() =>
             {
-                if (numAssets != oldNumAssets)
+                _logger.Information("Waiting for all outstanding downloads to complete");
+                int numItems = 0;
+                Interlocked.Exchange(ref numItems, _assets.Count);
+                numItems = _assets.Count;
+
+                int oldNumItems = numItems + 1;
+
+                while (numItems > 0)
                 {
-                    _logger.Information("Waiting for {n} assets to be processed ...", numAssets);
-                    oldNumAssets = numAssets;
+                    if (numItems != oldNumItems)
+                    {
+                        _logger.Information("Waiting for {n} assets to be processed ...", numItems);
+                        oldNumItems = numItems;
+                    }
+                    Thread.Sleep(1000);
+
+                    Interlocked.Exchange(ref numItems, _assets.Count);
+                    //numItems = _assets.Count;
                 }
-                Thread.Sleep(2000);
 
-                //Interlocked.Exchange(ref numAssets, _assets.Count);
-                numAssets = _assets.Count;
-            }
-            //}));
+                _logger.Debug("Waiting for remaining download tasks");
+                Task.WaitAll(_currentTasks.ToArray());
+            });
 
-            _logger.Debug("Waiting for remaining download tasks");
-            Task.WaitAll(_currentTasks.ToArray());
         }
 
         private async Task DoDownloadAsset(IAsset asset)

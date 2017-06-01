@@ -14,16 +14,24 @@ namespace MLSandboxPOC
         private readonly string _filePath;
         private readonly string _configuration;
         private readonly string _mediaProcessor;
+        private readonly bool _deleteFiles;
+
+        private IAsset _asset;
         private IContentKey _storedContentKey;
         //private IAccessPolicy _accessPolicy;
 
+        private static object _assetsLock = new object();
+        private static object _jobsLock = new object();
+        //private static object _tasksLock = new object();
+
         public IndexingJob(CloudMediaContext context, string filePath, string configuration,
-            string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
+            string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview, bool deleteFiles = true)
         {
             _context = context;
             _filePath = filePath;
             _configuration = configuration;
             _mediaProcessor = mediaProcessor;
+            _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<IndexingJob>();
         }
 
@@ -31,24 +39,31 @@ namespace MLSandboxPOC
         {
             _logger.Information("Running index job for {file}, using  Indexer {mediaProcessor}", _filePath, _mediaProcessor);
 
-            IAsset asset = CreateAssetAndUploadSingleFile(AssetCreationOptions.StorageEncrypted);
+            _asset = CreateAssetAndUploadSingleFile(AssetCreationOptions.StorageEncrypted);
 
-            _logger.Debug("Creating indexing job");
-
-            IJob job = _context.Jobs.Create($"Indexing Job:{_filePath}");
+            _logger.Debug("Creating job");
 
             var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(_mediaProcessor);
 
-            ITask task = job.Tasks.AddNew($"Indexing Task:{_filePath}",
-                processor,
-                _configuration,
-                TaskOptions.None);
+            IJob job;
+            ITask task;
+
+            lock (_jobsLock)
+            {
+                job = _context.Jobs.Create($"Indexing Job:{_filePath}");
+
+                task = job.Tasks.AddNew($"Indexing Task:{_filePath}",
+                    processor,
+                    _configuration,
+                    TaskOptions.None);
+            }
+
             _logger.Debug("Created task {task} for job", task.ToLog());
 
-            task.InputAssets.Add(asset);
+            task.InputAssets.Add(_asset);
 
             // Add an output asset to contain the results of the job.
-            task.OutputAssets.AddNew($"Indexing Output Asset:{_filePath}", AssetCreationOptions.StorageEncrypted);
+            task.OutputAssets.AddNew($"Indexing Output for {_filePath}", AssetCreationOptions.StorageEncrypted);
 
             job.StateChanged += StateChanged;
             job.Submit();
@@ -80,8 +95,13 @@ namespace MLSandboxPOC
 
         private IAsset CreateAssetAndUploadSingleFile(AssetCreationOptions options)
         {
-            IAsset asset = _context.Assets.CreateFromFile(_filePath, options);
-            _logger.Information("Created and uploaded asset {asset} from {file}", asset.ToLog(), _filePath);
+            IAsset asset;
+
+            lock (_assetsLock)
+            {
+                asset = _context.Assets.CreateFromFile(_filePath, options);
+                _logger.Information("Created and uploaded asset {asset} from {file}", asset.ToLog(), _filePath);
+            }
 
             //RemoveEncryptionKeys(asset);
             //RemoveEncryptionKey(asset);
@@ -110,40 +130,60 @@ namespace MLSandboxPOC
         {
             Console.WriteLine("Job state changed event:");
             Console.WriteLine("  Previous state: " + e.PreviousState);
-            //Console.WriteLine("  Current state: " + e.CurrentState);
-            _logger.Debug("  Current state: " + e.CurrentState);
-            IJob job = (IJob)sender;
+            _logger.Debug("  Current job state: " + e.CurrentState);
+            IJob job = (IJob) sender;
+            var asset = job.InputMediaAssets.FirstOrDefault();
 
             switch (e.CurrentState)
             {
                 case JobState.Finished:
-                    Console.WriteLine();
-                    Console.WriteLine("Job is finished.");
                     _logger.Debug("Job {job} is finished", job.ToLog());
-                    Console.WriteLine();
-                    break;
+                    if (_deleteFiles)
+                    {
+                        DeleteAsset();
+                    }
+                   break;
                 case JobState.Canceling:
                 case JobState.Queued:
                     Console.WriteLine("Please wait...");
                     break;
                 case JobState.Scheduled:
-                    var asset = job.InputMediaAssets.FirstOrDefault();
                     RestoreEncryptionKey(asset);
                     Console.WriteLine("Please wait...");
                     break;
                 case JobState.Processing:
                     Console.WriteLine("Please wait...");
+                    //if (_deleteFiles)
+                    //{
+                    //    DeleteAsset();
+                    //}
                     break;
                 case JobState.Canceled:
                 case JobState.Error:
-                    // Display or log error details as needed.
-                    // LogJobStop(job.Id);
                     _logger.Error("{job} job {CurrentState}", job.ToLog(), e.CurrentState);
+                    if (_deleteFiles)
+                    {
+                        DeleteAsset();
+                    }
                     break;
                 default:
                     break;
             }
         }
 
+        public void DeleteAsset()
+        {
+            if (_asset != null)
+            {
+                foreach (IAssetFile file in _asset.AssetFiles)
+                {
+                    _logger.Verbose("Deleting file {file} in asset {asset}", file.ToLog(), _asset.ToLog());
+                    file.Delete();
+                }
+                _logger.Verbose("Deleting asset {asset}", _asset.ToLog());
+                _asset.Delete();
+                _asset = null;
+            }
+        }
     }
 }
