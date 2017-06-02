@@ -16,6 +16,7 @@ namespace MLSandboxPOC
         private readonly string _mediaProcessor;
         private readonly bool _deleteFiles;
 
+        private readonly IMediaProcessor _processor;
         private IAsset _asset;
         private IContentKey _storedContentKey;
         //private IAccessPolicy _accessPolicy;
@@ -33,6 +34,7 @@ namespace MLSandboxPOC
             _mediaProcessor = mediaProcessor;
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<IndexingJob>();
+            _processor = _context.MediaProcessors.GetLatestMediaProcessorByName(_mediaProcessor);
         }
 
         public IAsset Run()
@@ -43,8 +45,6 @@ namespace MLSandboxPOC
 
             _logger.Debug("Creating job");
 
-            var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(_mediaProcessor);
-
             IJob job;
             ITask task;
 
@@ -53,7 +53,7 @@ namespace MLSandboxPOC
                 job = _context.Jobs.Create($"Indexing Job:{_filePath}");
 
                 task = job.Tasks.AddNew($"Indexing Task:{_filePath}",
-                    processor,
+                    _processor,
                     _configuration,
                     TaskOptions.None);
             }

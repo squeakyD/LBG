@@ -1,9 +1,8 @@
 ﻿using Microsoft.WindowsAzure.MediaServices.Client;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Timer = System.Timers.Timer;
@@ -25,25 +24,29 @@ namespace MLSandboxPOC
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
         private readonly string _configuration;
+        private readonly int _numberOfConcurrentTransfers;
         private readonly string _mediaProcessor;
         private readonly bool _deleteFiles;
         //private readonly string _inputFileDirectory;
-        private IManager<IAsset> _downloadManager;
+        private readonly IManager<IAsset> _downloadManager;
 
-        private readonly Queue<string> _fileNames = new Queue<string>();
+        private readonly ConcurrentQueue<string> _fileNames = new ConcurrentQueue<string>();
         //private readonly List<Task<IAsset>> _currentTasks = new List<Task<IAsset>>();
         private readonly List<Task> _currentTasks = new List<Task>();
         //private Task _checkJobs;
         private readonly Timer _timer;
 
-        public IndexingJobManager(CloudMediaContext context, string configuration,
+        public IndexingJobManager(CloudMediaContext context,
+            string configuration,
             IManager<IAsset> downloadManager,
+            int numberOfConcurrentTransfers,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview,
             int interval = 30, bool deleteFiles = true)
         {
             _context = context;
             _configuration = configuration;
             _downloadManager = downloadManager;
+            _numberOfConcurrentTransfers = numberOfConcurrentTransfers;
             _mediaProcessor = mediaProcessor;
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<IndexingJobManager>();
@@ -63,15 +66,13 @@ namespace MLSandboxPOC
         {
             _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
 
-            if (_fileNames.Count == 0)
+            while (_currentTasks.Count < _numberOfConcurrentTransfers && _fileNames.Count > 0)
             {
-                return;
-            }
-
-            while (_currentTasks.Count < _context.NumberOfConcurrentTransfers && _fileNames.Count > 0)
-            {
-                string inputFile = _fileNames.Dequeue();
-                _currentTasks.Add(RunJob(inputFile));
+                string inputFile;
+                if (_fileNames.TryDequeue(out inputFile))
+                {
+                    _currentTasks.Add(RunJob(inputFile));
+                }
             }
         }
 

@@ -2,8 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.MediaServices.Client;
@@ -12,48 +10,81 @@ using Timer = System.Timers.Timer;
 
 namespace MLSandboxPOC
 {
-    class DownloadManager: IManager<IAsset>
+    class DownloadManager : IManager<IAsset>
     {
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
         private readonly string _outputDirectory;
+        private readonly int _numberOfConcurrentTransfers;
         private readonly bool _deleteFiles;
 
-        private readonly Queue<IAsset> _assets = new Queue<IAsset>();
+        private readonly ConcurrentQueue<IAsset> _assets = new ConcurrentQueue<IAsset>();
         private readonly List<Task> _currentTasks = new List<Task>();
-        private readonly Timer _timer;
-
+        //private readonly Timer _timer;
+        private readonly Task _processTask;
+        private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
         //private readonly BlobTransferClient _blobClient = new BlobTransferClient();
-
-        public DownloadManager(CloudMediaContext context, string outputDirectory, int interval = 30, bool deleteFiles = true)
+        public DownloadManager(CloudMediaContext context,
+            string outputDirectory,
+            int numberOfConcurrentTransfers,
+            int interval = 30, bool deleteFiles = true)
         {
             _context = context;
             _outputDirectory = outputDirectory;
+            _numberOfConcurrentTransfers = numberOfConcurrentTransfers;
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<DownloadManager>();
 
-            _timer = new Timer(interval);
-            _timer.Elapsed += _timer_Elapsed;
-            _timer.AutoReset = true;
-            _timer.Enabled = true;
+            //_timer = new Timer(interval);
+            //_timer.Elapsed += _timer_Elapsed;
+            //_timer.AutoReset = true;
+            //_timer.Enabled = true;
+
+            _processTask = ProcessTasks();
         }
 
+        //private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        //{
+        //    _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
 
-        private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        //    //if (_assets.Count == 0)
+        //    //{
+        //    //    return;
+        //    //}
+
+        //    while (_currentTasks.Count < _numberOfConcurrentTransfers && _assets.Count > 0)
+        //    {
+        //        IAsset assetToDownload;
+        //        if (_assets.TryDequeue(out assetToDownload))
+        //        {
+        //            _currentTasks.Add(Task.Run(() => DoDownloadAsset(assetToDownload)));
+        //        }
+        //    }
+        //}
+        private Task ProcessTasks()
         {
-            _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
-            
-            if (_assets.Count == 0)
-            {
-                return;
-            }
+            var token = _tokenSource.Token;
 
-            while (_currentTasks.Count < _context.NumberOfConcurrentTransfers && _assets.Count > 0)
-            {
-                var assetToDownload = _assets.Dequeue();
-                //++_runningTasks;
-                _currentTasks.Add(Task.Run(() => DoDownloadAsset(assetToDownload)));
-            }
+            var task = Task.Run(() =>
+             {
+                 while (!token.IsCancellationRequested)
+                 {
+                     _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
+
+                     while (_currentTasks.Count < _numberOfConcurrentTransfers && _assets.Count > 0)
+                     {
+                         IAsset assetToDownload;
+                         if (_assets.TryDequeue(out assetToDownload))
+                         {
+                             _currentTasks.Add(Task.Run(() => DoDownloadAsset(assetToDownload)));
+                         }
+                     }
+
+                     token.ThrowIfCancellationRequested();
+                 }
+             }, token);
+
+            return task;
         }
 
         public void QueueItem(IAsset asset)
@@ -116,7 +147,30 @@ namespace MLSandboxPOC
                 }
 
                 _logger.Debug("Waiting for remaining download tasks");
+
                 Task.WaitAll(_currentTasks.ToArray());
+
+                _tokenSource.Cancel();
+
+                try
+                {
+                    _processTask.Wait();
+                }
+                catch (AggregateException ae)
+                {
+                    ae.Handle(ex =>
+                    {
+                        if (ex is OperationCanceledException)
+                        {
+                            _logger.Information("Exited ProcessTasks");
+                        }
+                        return ex is OperationCanceledException;
+                    });
+                }
+                finally
+                {
+                    _tokenSource.Dispose();
+                }
             });
 
         }
@@ -158,9 +212,9 @@ namespace MLSandboxPOC
                     await asset.DeleteAsync();
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                _logger.Error(ex, "Error occurred downloading files from asset {asset}", asset.ToLog()); 
+                _logger.Error(ex, "Error occurred downloading files from asset {asset}", asset.ToLog());
             }
         }
     }

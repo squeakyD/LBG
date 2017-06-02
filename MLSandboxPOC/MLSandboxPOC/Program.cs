@@ -22,6 +22,7 @@ namespace MLSandboxPOC
         //private static readonly string _mediaServicesAccountName = ConfigurationManager.AppSettings["MediaServicesAccountName"];
         //private static readonly string _mediaServicesAccountKey = ConfigurationManager.AppSettings["MediaServicesAccountKey"];
         private static readonly string _sourceDir = ConfigurationManager.AppSettings["SourceDirectory"];
+        private static readonly string _processedDirectory = ConfigurationManager.AppSettings["ProcessedDirectory"];
         private static readonly string _outDir = ConfigurationManager.AppSettings["OutputDirectory"];
 
         // Field for service context.
@@ -75,19 +76,17 @@ namespace MLSandboxPOC
                     }
                 }
 
+                _context.NumberOfConcurrentTransfers = 25;
+
                 _restClient = new MSRestClient(_cachedCredentials);
 
-                _downloadManager = new DownloadManager(_context, _outDir);
+                _downloadManager = new DownloadManager(_context, _outDir, _context.NumberOfConcurrentTransfers / 2);
                 string configuration = File.ReadAllText("config.json");
-                _indexingJobManager = new IndexingJobManager(_context, configuration, _downloadManager);
+                _indexingJobManager = new IndexingJobManager(_context, configuration, _downloadManager, _context.NumberOfConcurrentTransfers / 2);
 
                 // Run indexing job.
                 _indexingJobManager.QueueItem(src);
                 _indexingJobManager.QueueItem(src2);
-                _context.NumberOfConcurrentTransfers = 25;
-
-                //var asset = RunIndexingJob(src, @"config.json");
-                //var asset = RunIndexingJob(src, @"indexer1cfg.xml", MediaProcessorNames.AzureMediaIndexer);
 
                 // Download the job output asset.
                 //DownloadAsset(asset, _outDir);
@@ -98,16 +97,6 @@ namespace MLSandboxPOC
                 var t2 = _downloadManager.WaitForAllTasks();
                 t2.Wait();
                 //Task.WaitAll(t1, t2);
-
-                //foreach (var s in new[] {src,src2,src3,src4,src5})
-                //{
-                //    var asset = RunIndexingJob(src, @"..\..\config.json");
-                //}
-
-                if (_delFiles)
-                {
-                    DeleteAssetFiles();
-                }
             }
             catch (Exception ex)
             {
@@ -160,81 +149,6 @@ namespace MLSandboxPOC
             _cachedCredentials = new MediaServicesCredentials(accountName, accountKey);
         }
 
-        static IAsset RunIndexingJob(string inputMediaFilePath, string configurationFile, string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
-        {
-            ////_logger.Information("Running index job for {inputMediaFilePath}", _sourceDir);
-            //_logger.Information("Running index job for {inputMediaFilePath}", inputMediaFilePath);
-            //_logger.Information("Using Indexer {mediaProcessor}", mediaProcessor);
-
-            //// Create an asset and upload the input media file to storage.
-            //IAsset asset = CreateAssetAndUploadSingleFile(inputMediaFilePath,
-            //    "My Indexing Input Asset",
-            //    //AssetCreationOptions.None);
-            //    AssetCreationOptions.StorageEncrypted);
-
-            ////var asset = CreateAssetFromFolder();
-
-            //_logger.Debug("Creating indexing job");
-
-            //// Declare a new job.
-            //IJob job = _context.Jobs.Create("My Indexing Job");
-
-            ////var processor = GetLatestMediaProcessorByName(MediaProcessorNames.AzureMediaIndexer2Preview);
-            //var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(mediaProcessor);
-
-            // Read configuration from the specified file.
-            string configuration = File.ReadAllText(configurationFile);
-
-            var job = new IndexingJob(_context, inputMediaFilePath, configuration);
-            return job.Run();
-
-            //// Create a task with the encoding details, using a string preset.
-            //ITask task = job.Tasks.AddNew("My Indexing Task",
-            //    processor,
-            //    configuration,
-            //    TaskOptions.None);
-
-            //_logger.Debug("Created task {task} for job", task.ToLog());
-
-            ////RestoreEncryptionKey(asset);
-            ////RestoreEncryptionKeys(asset);
-
-            //// Specify the input asset to be indexed.
-            //task.InputAssets.Add(asset);
-
-            //// Add an output asset to contain the results of the job.
-            //task.OutputAssets.AddNew("My Indexing Output Asset", AssetCreationOptions.StorageEncrypted);
-
-            //// Use the following event handler to check job progress.  
-            //job.StateChanged += new EventHandler<JobStateChangedEventArgs>(StateChanged);
-
-            //_logger.Information("Submitted job {job}", job.ToLog());
-
-            //// Launch the job.
-            //job.Submit();
-
-            //// Check job execution and wait for job to finish.
-            //Task progressJobTask = job.GetExecutionProgressTask(CancellationToken.None);
-
-            //progressJobTask.Wait();
-
-            //// If job state is Error, the event handling
-            //// method for job progress should log errors.  Here we check
-            //// for error state and exit if needed.
-            //if (job.State == JobState.Error)
-            //{
-            //    ErrorDetail error = job.Tasks.First().ErrorDetails.First();
-            //    _logger.Warning($"Error: {error.Code}. {error.Message}");
-            //    return null;
-            //}
-            //var elapsed = job.EndTime - job.StartTime;
-
-            //_logger.Information("-> Indexing job for {file} took {elapsed} seconds (processor={processor})", inputMediaFilePath,
-            //    elapsed?.Seconds ?? 0, mediaProcessor);
-
-            //return job.OutputMediaAssets[0];
-        }
-
         private static IAsset CreateAssetFromFolder()
         {
             _logger.Debug("Creating asset and uploading all files in {folder}", _sourceDir);
@@ -255,27 +169,6 @@ namespace MLSandboxPOC
         }
 
         //private static List<IContentKey> _savedStorageKeys = new List<IContentKey>();
-
-        static IAsset CreateAssetAndUploadSingleFile(string filePath, string assetName, AssetCreationOptions options)
-        {
-            IAsset asset = _context.Assets.Create(assetName, options);
-            _logger.Debug("Created asset {asset}", asset.ToLog());
-
-            //_storedContentKey = CreateCommonTypeContentKey(asset);
-
-            var assetFile = asset.AssetFiles.Create(Path.GetFileName(filePath));
-
-
-            assetFile.Upload(filePath);
-            _logger.Information("Uploaded {filePath} to {assetFile}", filePath, assetFile.ToLog());
-
-            //RemoveEncryptionKeys(asset);
-            RemoveEncryptionKey(asset);
-
-            //var test = asset.ContentKeys;
-
-            return asset;
-        }
 
         private static IContentKey _storedContentKey;
 
@@ -443,29 +336,6 @@ namespace MLSandboxPOC
         //    });
         //}            
 
-
-        static void DownloadAsset(IAsset asset, string outputDirectory)
-        {
-            _logger.Debug("Downloading files");
-            foreach (IAssetFile file in asset.AssetFiles)
-            {
-                _logger.Information("Downloading {file}", file.ToLog());
-                file.Download(Path.Combine(outputDirectory, file.Name));
-
-                if (_delFiles)
-                {
-                    _logger.Debug("Deleting output file {file} in asset {asset}", file.ToLog(), asset.ToLog());
-                    file.Delete();
-                }
-            }
-
-            if (_delFiles)
-            {
-                _logger.Debug("Deleting output asset {asset}", asset.ToLog());
-                asset.Delete();
-            }
-        }
-
         private static void DeleteAssetFiles()
         {
             foreach (var asset in _context.Assets)
@@ -478,45 +348,6 @@ namespace MLSandboxPOC
 
                 _logger.Information("Deleting asset {asset}", asset.ToLog());
                 asset.Delete();
-            }
-        }
-
-        private static void StateChanged(object sender, JobStateChangedEventArgs e)
-        {
-            Console.WriteLine("Job state changed event:");
-            Console.WriteLine("  Previous state: " + e.PreviousState);
-            //Console.WriteLine("  Current state: " + e.CurrentState);
-            _logger.Debug("  Current state: " + e.CurrentState);
-            IJob job = (IJob)sender;
-
-            switch (e.CurrentState)
-            {
-                case JobState.Finished:
-                    Console.WriteLine();
-                    Console.WriteLine("Job is finished.");
-                    _logger.Debug("Job {job} is finished", job.ToLog());
-                    Console.WriteLine();
-                    break;
-                case JobState.Canceling:
-                case JobState.Queued:
-                    Console.WriteLine("Please wait...");
-                    break;
-                case JobState.Scheduled:
-                    var asset = job.InputMediaAssets.FirstOrDefault();
-                    RestoreEncryptionKey(asset);
-                    Console.WriteLine("Please wait...");
-                    break;
-                case JobState.Processing:
-                    Console.WriteLine("Please wait...");
-                    break;
-                case JobState.Canceled:
-                case JobState.Error:
-                    // Display or log error details as needed.
-                    // LogJobStop(job.Id);
-                    _logger.Error("{job} job {CurrentState}", job.ToLog(), e.CurrentState);
-                    break;
-                default:
-                    break;
             }
         }
     }
