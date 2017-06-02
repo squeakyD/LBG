@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.MediaServices.Client;
 using Serilog;
-using Timer = System.Timers.Timer;
+using System.Diagnostics;
 
 namespace MLSandboxPOC
 {
@@ -20,14 +20,29 @@ namespace MLSandboxPOC
 
         private readonly ConcurrentQueue<IAsset> _assets = new ConcurrentQueue<IAsset>();
         private readonly List<Task> _currentTasks = new List<Task>();
-        //private readonly Timer _timer;
         private readonly Task _processTask;
         private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
         //private readonly BlobTransferClient _blobClient = new BlobTransferClient();
-        public DownloadManager(CloudMediaContext context,
+
+        private static DownloadManager _instance;
+
+        public static DownloadManager CreateDownloadManager(CloudMediaContext context,
             string outputDirectory,
             int numberOfConcurrentTransfers,
-            int interval = 30, bool deleteFiles = true)
+            bool deleteFiles = true)
+        {
+            Debug.Assert(_instance == null);
+            if (_instance == null)
+            {
+                _instance = new DownloadManager(context, outputDirectory, numberOfConcurrentTransfers, deleteFiles);
+            }
+            return _instance;
+        }
+
+        private DownloadManager(CloudMediaContext context,
+            string outputDirectory,
+            int numberOfConcurrentTransfers,
+            bool deleteFiles = true)
         {
             _context = context;
             _outputDirectory = outputDirectory;
@@ -35,32 +50,9 @@ namespace MLSandboxPOC
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<DownloadManager>();
 
-            //_timer = new Timer(interval);
-            //_timer.Elapsed += _timer_Elapsed;
-            //_timer.AutoReset = true;
-            //_timer.Enabled = true;
-
             _processTask = ProcessTasks();
         }
 
-        //private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        //{
-        //    _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
-
-        //    //if (_assets.Count == 0)
-        //    //{
-        //    //    return;
-        //    //}
-
-        //    while (_currentTasks.Count < _numberOfConcurrentTransfers && _assets.Count > 0)
-        //    {
-        //        IAsset assetToDownload;
-        //        if (_assets.TryDequeue(out assetToDownload))
-        //        {
-        //            _currentTasks.Add(Task.Run(() => DoDownloadAsset(assetToDownload)));
-        //        }
-        //    }
-        //}
         private Task ProcessTasks()
         {
             var token = _tokenSource.Token;
@@ -93,35 +85,6 @@ namespace MLSandboxPOC
             _assets.Enqueue(asset);
         }
 
-        //public void WaitForAllTasks()
-        //{
-        //    _logger.Information("Waiting for all outstanding downloads to complete");
-
-        //    //_currentTasks.Add(Task.Run(() =>
-        //    //{
-        //    int numItems = 0;
-        //    //Interlocked.Exchange(ref numAssets, _assets.Count);
-        //    numItems = _assets.Count;
-
-        //    int oldNumItems = numItems + 1;
-
-        //    while (numItems > 0)
-        //    {
-        //        if (numItems != oldNumItems)
-        //        {
-        //            _logger.Information("Waiting for {n} assets to be processed ...", numItems);
-        //            oldNumItems = numItems;
-        //        }
-        //        Thread.Sleep(2000);
-
-        //        //Interlocked.Exchange(ref numAssets, _assets.Count);
-        //        numItems = _assets.Count;
-        //    }
-        //    //}));
-
-        //    _logger.Debug("Waiting for remaining download tasks");
-        //    Task.WaitAll(_currentTasks.ToArray());
-        //}
         public Task WaitForAllTasks()
         {
             return Task.Run(() =>
@@ -147,7 +110,6 @@ namespace MLSandboxPOC
                 }
 
                 _logger.Debug("Waiting for remaining download tasks");
-
                 Task.WaitAll(_currentTasks.ToArray());
 
                 _tokenSource.Cancel();

@@ -11,12 +11,12 @@ namespace MLSandboxPOC
     {
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
+        private readonly FileProcessNotifier _fileProcessedNotifier;
         private readonly string _filePath;
         private readonly string _configuration;
         private readonly string _mediaProcessor;
         private readonly bool _deleteFiles;
 
-        private readonly IMediaProcessor _processor;
         private IAsset _asset;
         private IContentKey _storedContentKey;
         //private IAccessPolicy _accessPolicy;
@@ -25,16 +25,18 @@ namespace MLSandboxPOC
         private static object _jobsLock = new object();
         //private static object _tasksLock = new object();
 
-        public IndexingJob(CloudMediaContext context, string filePath, string configuration,
+        public IndexingJob(CloudMediaContext context,
+            FileProcessNotifier fileProcessedNotifier, 
+            string filePath, string configuration,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview, bool deleteFiles = true)
         {
             _context = context;
+            _fileProcessedNotifier = fileProcessedNotifier;
             _filePath = filePath;
             _configuration = configuration;
             _mediaProcessor = mediaProcessor;
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<IndexingJob>();
-            _processor = _context.MediaProcessors.GetLatestMediaProcessorByName(_mediaProcessor);
         }
 
         public IAsset Run()
@@ -45,6 +47,8 @@ namespace MLSandboxPOC
 
             _logger.Debug("Creating job");
 
+            var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(_mediaProcessor);
+
             IJob job;
             ITask task;
 
@@ -53,7 +57,7 @@ namespace MLSandboxPOC
                 job = _context.Jobs.Create($"Indexing Job:{_filePath}");
 
                 task = job.Tasks.AddNew($"Indexing Task:{_filePath}",
-                    _processor,
+                    processor,
                     _configuration,
                     TaskOptions.None);
             }
@@ -103,6 +107,7 @@ namespace MLSandboxPOC
                 _logger.Information("Created and uploaded asset {asset} from {file}", asset.ToLog(), _filePath);
             }
 
+            _fileProcessedNotifier.NotifyFileProcessed(_filePath);
             //RemoveEncryptionKeys(asset);
             //RemoveEncryptionKey(asset);
 

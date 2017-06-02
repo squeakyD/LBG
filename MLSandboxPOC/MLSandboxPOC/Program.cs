@@ -1,14 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Security.Policy;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.WindowsAzure.MediaServices.Client;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -28,7 +22,6 @@ namespace MLSandboxPOC
         // Field for service context.
         private static CloudMediaContext _context = null;
         private static MediaServicesCredentials _cachedCredentials = null;
-        private static bool _delFiles;
 
         private static ILogger _logger;
         private static MSRestClient _restClient;
@@ -41,14 +34,20 @@ namespace MLSandboxPOC
             {
                 _logger = Logger.GetLog<Program>();
 
+                //AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+
+                Console.WriteLine("ML Sandbox POC");
+                Console.WriteLine("==============");
+                Console.WriteLine();
+
                 CreateCredentials();
 
                 // Used the cached credentials to create CloudMediaContext.
                 _context = new CloudMediaContext(_cachedCredentials);
 
                 //string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
-                string src = Path.Combine(_sourceDir, "612026009249280 040417_1.wav");
-                string src2 = Path.Combine(_sourceDir, "612026009249280 040417_2.wav");
+                //string src = Path.Combine(_sourceDir, "612026009249280 040417_1.wav");
+                //string src2 = Path.Combine(_sourceDir, "612026009249280 040417_2.wav");
                 //string src = Path.Combine(_sourceDir, "612026009249280 040417 0932_1191101cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009249955 040417 1028_1191101cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009250579 040417 1110_1191101cut.wav");
@@ -61,50 +60,57 @@ namespace MLSandboxPOC
                         DeleteAssetFiles();
                         return;
                     }
-                    else if (args[0].Equals("delAfter", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        _delFiles = true;
-                    }
                     else if (args[0].Equals("getAssets", StringComparison.InvariantCultureIgnoreCase))
                     {
                         GetAllAssetFiles();
                         return;
                     }
-                    else if (args[0].Equals("-f", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        src = Path.Combine(_sourceDir, args[1]);
-                    }
+                    //else if (args[0].Equals("-f", StringComparison.InvariantCultureIgnoreCase))
+                    //{
+                    //    src = Path.Combine(_sourceDir, args[1]);
+                    //}
                 }
 
                 _context.NumberOfConcurrentTransfers = 25;
 
                 _restClient = new MSRestClient(_cachedCredentials);
 
-                _downloadManager = new DownloadManager(_context, _outDir, _context.NumberOfConcurrentTransfers / 2);
+                _downloadManager = DownloadManager.CreateDownloadManager(_context, _outDir, _context.NumberOfConcurrentTransfers / 2);
+
+                var fileProcessNotifier = FileProcessNotifier.Instance;
+
                 string configuration = File.ReadAllText("config.json");
-                _indexingJobManager = new IndexingJobManager(_context, configuration, _downloadManager, _context.NumberOfConcurrentTransfers / 2);
+                _indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_context, configuration, fileProcessNotifier, _downloadManager, _context.NumberOfConcurrentTransfers / 2);
+
+                var fileMgr = FileSourceManager.CreateFileSourceManager(_sourceDir, _processedDirectory, _indexingJobManager, fileProcessNotifier);
+
+                Console.WriteLine("Started filewatcher");
+                Console.WriteLine("-> Press any key to exit");
+
+                Console.ReadKey();
+
+                var t1 = _indexingJobManager.WaitForAllTasks();
+                t1.Wait();
+                var t2 = _downloadManager.WaitForAllTasks();
+                t2.Wait();
 
                 // Run indexing job.
-                _indexingJobManager.QueueItem(src);
-                _indexingJobManager.QueueItem(src2);
+                //_indexingJobManager.QueueItem(src);
+                //_indexingJobManager.QueueItem(src2);
 
                 // Download the job output asset.
                 //DownloadAsset(asset, _outDir);
                 //_downloadManager.QueueItem(asset);
-
-                var t1 =_indexingJobManager.WaitForAllTasks();
-                t1.Wait();
-                var t2 = _downloadManager.WaitForAllTasks();
-                t2.Wait();
-                //Task.WaitAll(t1, t2);
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Fatal error in demo program!!!");
-                //Console.WriteLine(ex);
-                //throw;
             }
         }
+
+        //private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        //{
+        //}
 
         private static void GetAllAssetFiles()
         {
