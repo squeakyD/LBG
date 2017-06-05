@@ -75,12 +75,12 @@ namespace MLSandboxPOC
 
                 _restClient = new MSRestClient(_cachedCredentials);
 
-                _downloadManager = DownloadManager.CreateDownloadManager(_context, _outDir, _context.NumberOfConcurrentTransfers / 2);
+                _downloadManager = DownloadManager.CreateDownloadManager(_context, _outDir, _context.NumberOfConcurrentTransfers);
 
                 var fileProcessNotifier = FileProcessNotifier.Instance;
 
                 string configuration = File.ReadAllText("config.json");
-                _indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_context, configuration, fileProcessNotifier, _downloadManager, _context.NumberOfConcurrentTransfers / 2);
+                _indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_context, configuration, fileProcessNotifier, _downloadManager, _context.NumberOfConcurrentTransfers);
 
                 var fileMgr = FileSourceManager.CreateFileSourceManager(_sourceDir, _processedDirectory, _indexingJobManager, fileProcessNotifier);
 

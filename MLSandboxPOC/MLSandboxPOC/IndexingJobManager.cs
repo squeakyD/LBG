@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -71,7 +72,22 @@ namespace MLSandboxPOC
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<IndexingJobManager>();
 
+            SetMediaReservedUnits();
+
             _processTask = ProcessTasks();
+        }
+
+        private void SetMediaReservedUnits()
+        {
+            IEncodingReservedUnit encodingS1ReservedUnit = _context.EncodingReservedUnits.FirstOrDefault();
+            encodingS1ReservedUnit.ReservedUnitType = ReservedUnitType.Basic; // Corresponds to S1
+            encodingS1ReservedUnit.Update();
+            _logger.Verbose("Reserved Unit Type: {ReservedUnitType}", encodingS1ReservedUnit.ReservedUnitType);
+
+            encodingS1ReservedUnit.CurrentReservedUnits = _numberOfConcurrentTransfers;
+            encodingS1ReservedUnit.Update();
+
+            _logger.Verbose("Number of reserved units: {currentReservedUnits}", encodingS1ReservedUnit.CurrentReservedUnits);
         }
 
         //public List<string> UnprocessedFiles => new List<string>();

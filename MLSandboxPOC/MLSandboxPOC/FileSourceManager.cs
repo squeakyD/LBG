@@ -19,41 +19,51 @@ namespace MLSandboxPOC
         private readonly string _sourceDirectory;
         private readonly string _processedDirectory;
         private readonly IManager<string> _indexingJobManager;
-        private readonly int _interval;
         private readonly Timer _timer;
 
         private static readonly string _processingDirectory = ConfigurationManager.AppSettings["ProcessingDirectory"];
         private static readonly string _searchPattern = ConfigurationManager.AppSettings["SourceFilePattern"];
+        private static readonly string _fileWatcherInterval = ConfigurationManager.AppSettings["FileWatcherInterval"];
 
         private static FileSourceManager _instance;
 
         private readonly static object _fileProcessorLock = new object();
 
         public static FileSourceManager CreateFileSourceManager(string sourceDirectory, string processedDirectory,
-            IManager<string> indexingJobManager, FileProcessNotifier notifier,
-            int interval = 30)
+            IManager<string> indexingJobManager, FileProcessNotifier notifier)
         {
             Debug.Assert(_instance == null);
-            _instance = new FileSourceManager(sourceDirectory, processedDirectory, indexingJobManager, interval);
+            _instance = new FileSourceManager(sourceDirectory, processedDirectory, indexingJobManager);
             notifier.AddFileObserver(_instance);
             return _instance;
         }
 
         private FileSourceManager(string sourceDirectory,string processedDirectory,
-            IManager<string> indexingJobManager,
-            int interval = 30)
+            IManager<string> indexingJobManager)
         {
             _sourceDirectory = sourceDirectory;
             _processedDirectory = processedDirectory;
             _indexingJobManager = indexingJobManager;
-            _interval = interval;
             _logger = Logger.GetLog<FileSourceManager>();
 
             CheckDirectoriesExist();
 
-            CheckSourceDirectory();
+            int intervalInSeconds = 10;
 
-            _timer = new Timer(interval);
+            if (!string.IsNullOrEmpty(_fileWatcherInterval))
+            {
+                try
+                {
+                    intervalInSeconds = Int32.Parse(_fileWatcherInterval);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("Error parsing FileWatcherInterval configuration value");
+                    throw;
+                }
+            }
+
+            _timer = new Timer(intervalInSeconds * 1000);
             _timer.Elapsed += _timer_Elapsed;
             _timer.AutoReset = true;
             _timer.Enabled = true;
@@ -87,9 +97,16 @@ namespace MLSandboxPOC
                 try
                 {
                     string fileToProcess = Path.Combine(_processingDirectory, Path.GetFileName(filePath));
-                    File.Move(filePath, Path.Combine(_processingDirectory, fileToProcess));
+                    string dest = Path.Combine(_processingDirectory, fileToProcess);
 
-                    _indexingJobManager.QueueItem(fileToProcess);
+                    if (File.Exists(dest))
+                    {
+                        File.Delete(dest);
+                        _logger.Warning("Found and deleted {file} in {processing} directory which matches a previously uploaded filename", dest, _processingDirectory);
+                    }
+
+                    File.Move(filePath, dest);
+                   _indexingJobManager.QueueItem(fileToProcess);
                 }
                 catch (Exception ex)
                 {
@@ -105,6 +122,12 @@ namespace MLSandboxPOC
                 try
                 {
                     string dest = Path.Combine(_processedDirectory, Path.GetFileName(filePath));
+                    if (File.Exists(dest))
+                    {
+                        File.Delete(dest);
+                        _logger.Warning("Found and deleted {file} in {processed} directory which matches a previously processed filename", dest, _processedDirectory);
+                    }
+
                     File.Move(filePath, dest);
 
                     _logger.Debug("Processed {file}", Path.GetFileName(filePath));
