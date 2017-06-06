@@ -69,6 +69,11 @@ namespace MLSandboxPOC
             _timer.Enabled = true;
         }
 
+        public void ShutdownTimer()
+        {
+            _timer.Stop();
+        }
+
         private void CheckDirectoriesExist()
         {
             if (!Directory.Exists(_processingDirectory))

@@ -181,7 +181,7 @@ namespace MLSandboxPOC
         {
             return Task.Run(() =>
                 {
-                    var job = new IndexingJob(_context,_fileProcessedNotifier, fileName, _configuration);
+                    var job = new IndexingJob(_context, _fileProcessedNotifier, fileName, _configuration, _mediaProcessor);
                     try
                     {
                         var outputAsset = job.Run();

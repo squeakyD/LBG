@@ -4,7 +4,7 @@
     {
       "Options": {
         "Formats": [ "WebVtt", "ttml" ],
-        "Language": "enUs",
+        "Language": "enGb",
         "Type": "RecoOptions"
       },
       "Type": "SpReco"

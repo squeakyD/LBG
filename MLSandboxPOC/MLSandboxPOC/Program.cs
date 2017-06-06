@@ -89,6 +89,7 @@ namespace MLSandboxPOC
 
                 Console.ReadKey();
 
+                fileMgr.ShutdownTimer();
                 var t1 = _indexingJobManager.WaitForAllTasks();
                 t1.Wait();
                 var t2 = _downloadManager.WaitForAllTasks();
