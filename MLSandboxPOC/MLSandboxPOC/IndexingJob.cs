@@ -109,7 +109,10 @@ namespace MLSandboxPOC
 
             _fileProcessedNotifier.NotifyFileProcessed(_filePath);
             //RemoveEncryptionKeys(asset);
-            //RemoveEncryptionKey(asset);
+            RemoveEncryptionKey(asset);
+
+            // TEST
+            RestoreEncryptionKey(asset);
 
             //var test = asset.ContentKeys;
             return asset;
@@ -117,7 +120,7 @@ namespace MLSandboxPOC
 
         private void RemoveEncryptionKey(IAsset asset)
         {
-            //return; // temp
+            return; // temp
             _storedContentKey = asset.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
             asset.ContentKeys.Remove(_storedContentKey);
             asset.Update();
@@ -125,10 +128,33 @@ namespace MLSandboxPOC
             //    //key.Delete();
             //    _logger.Debug("Removed encryption key {key} from asset {asset}",_storedContentKey.Id, asset.ToLog());
         }
+        static string GuidFromId(string id)
+        {
+            string guid = id.Substring(id.IndexOf("UUID:", StringComparison.OrdinalIgnoreCase) + 5);
+            return guid;
+        }
 
         private void RestoreEncryptionKey(IAsset asset)
         {
-            // TOOD
+            return; // TOOD
+            _logger.Debug("Adding key {key} to asset {asset} and context", _storedContentKey.Id, asset.ToLog());
+
+            byte[] keyData = Convert.FromBase64String(_storedContentKey.EncryptedContentKey); //_storedContentKey.GetClearKeyValue()
+            //Guid keyId = Guid.NewGuid();
+            var cert = EncryptionUtils.GetCertificateFromStore(_storedContentKey.ProtectionKeyId);
+
+            //var rawKey = _storedContentKey.GetEncryptedKeyValue(cert);
+            var fe=new FileEncryption();
+
+            byte[] encryptedContentKey = fe.EncryptContentKeyToCertificate(cert);
+            var rawKey = EncryptionUtils.EncryptSymmetricKeyData(cert, keyData);
+            var newKey= _context.ContentKeys.Create(Guid.Parse(GuidFromId(_storedContentKey.Id)), encryptedContentKey, _storedContentKey.Name, _storedContentKey.ContentKeyType);
+            //var newKey = _context.ContentKeys.Create(keyId, rawKey, key.Name, key.ContentKeyType);
+            //var newKey = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+            //newKey.EncryptedContentKey
+            //asset.ContentKeys.Add(_storedContentKey);
+            //var ck = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == key.Id);
+            asset.ContentKeys.Add(newKey);
         }
 
         private void StateChanged(object sender, JobStateChangedEventArgs e)
