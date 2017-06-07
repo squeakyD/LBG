@@ -19,7 +19,9 @@ namespace MLSandboxPOC
 
         private IAsset _asset;
         private IContentKey _storedContentKey;
+        private byte[] _storedKeyData;
         //private IAccessPolicy _accessPolicy;
+        private const string KeyIdentifierPrefix = "nb:kid:UUID:";
 
         private static object _assetsLock = new object();
         private static object _jobsLock = new object();
@@ -107,53 +109,38 @@ namespace MLSandboxPOC
                 _logger.Information("Created and uploaded asset {asset} from {file}", asset.ToLog(), _filePath);
             }
 
-            _fileProcessedNotifier.NotifyFileProcessed(_filePath);
-            //RemoveEncryptionKeys(asset);
             RemoveEncryptionKey(asset);
 
+            _fileProcessedNotifier.NotifyFileProcessed(_filePath);
+
             // TEST
-            RestoreEncryptionKey(asset);
+            //RestoreEncryptionKey(asset);
 
             //var test = asset.ContentKeys;
             return asset;
         }
 
-        private void RemoveEncryptionKey(IAsset asset)
+      private void RemoveEncryptionKey(IAsset asset)
         {
-            return; // temp
             _storedContentKey = asset.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+            _storedKeyData = _storedContentKey.GetClearKeyValue();
             asset.ContentKeys.Remove(_storedContentKey);
             asset.Update();
-            //    //var key=_context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == _storedContentKey.Id);
-            //    //key.Delete();
-            //    _logger.Debug("Removed encryption key {key} from asset {asset}",_storedContentKey.Id, asset.ToLog());
+
+            _logger.Verbose("Removed encryption key {key} from asset {asset}", _storedContentKey.Id, asset.ToLog());
         }
+
         static string GuidFromId(string id)
         {
-            string guid = id.Substring(id.IndexOf("UUID:", StringComparison.OrdinalIgnoreCase) + 5);
+            string guid = id.Substring(id.IndexOf(KeyIdentifierPrefix, StringComparison.OrdinalIgnoreCase) + KeyIdentifierPrefix.Length);
             return guid;
         }
 
         private void RestoreEncryptionKey(IAsset asset)
         {
-            return; // TOOD
-            _logger.Debug("Adding key {key} to asset {asset} and context", _storedContentKey.Id, asset.ToLog());
+            _logger.Verbose("Restoring key {key} to asset {asset}", _storedContentKey.Id, asset.ToLog());
 
-            byte[] keyData = Convert.FromBase64String(_storedContentKey.EncryptedContentKey); //_storedContentKey.GetClearKeyValue()
-            //Guid keyId = Guid.NewGuid();
-            var cert = EncryptionUtils.GetCertificateFromStore(_storedContentKey.ProtectionKeyId);
-
-            //var rawKey = _storedContentKey.GetEncryptedKeyValue(cert);
-            var fe=new FileEncryption();
-
-            byte[] encryptedContentKey = fe.EncryptContentKeyToCertificate(cert);
-            var rawKey = EncryptionUtils.EncryptSymmetricKeyData(cert, keyData);
-            var newKey= _context.ContentKeys.Create(Guid.Parse(GuidFromId(_storedContentKey.Id)), encryptedContentKey, _storedContentKey.Name, _storedContentKey.ContentKeyType);
-            //var newKey = _context.ContentKeys.Create(keyId, rawKey, key.Name, key.ContentKeyType);
-            //var newKey = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
-            //newKey.EncryptedContentKey
-            //asset.ContentKeys.Add(_storedContentKey);
-            //var ck = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == key.Id);
+            var newKey= _context.ContentKeys.Create(Guid.Parse(GuidFromId(_storedContentKey.Id)), _storedKeyData, _storedContentKey.Name, _storedContentKey.ContentKeyType);
             asset.ContentKeys.Add(newKey);
         }
 
@@ -179,10 +166,11 @@ namespace MLSandboxPOC
                     Console.WriteLine("Please wait...");
                     break;
                 case JobState.Scheduled:
-                    RestoreEncryptionKey(asset);
+                    //RestoreEncryptionKey(asset);
                     Console.WriteLine("Please wait...");
                     break;
                 case JobState.Processing:
+                    RestoreEncryptionKey(asset);
                     Console.WriteLine("Please wait...");
                     //if (_deleteFiles)
                     //{

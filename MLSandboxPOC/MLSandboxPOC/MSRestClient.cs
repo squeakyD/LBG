@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.WindowsAzure.MediaServices.Client;
 using System.Net;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Serilog;
 
 namespace MLSandboxPOC
@@ -134,5 +135,59 @@ namespace MLSandboxPOC
 
             return request;
         }
+
+        public void RestoreEncryptionKey(IAsset asset, IContentKey contentKey)
+        {
+            _logger.Debug("RestoreEncryptionKey: asset {asset}", asset.ToLog());
+            var newKey = new ContentKey
+            {
+                Name = contentKey.Name,
+                ProtectionKeyId = contentKey.ProtectionKeyId,
+                ContentKeyType = (int)contentKey.ContentKeyType,
+                ProtectionKeyType = (int)contentKey.ProtectionKeyType,
+                EncryptedContentKey = contentKey.EncryptedContentKey,
+                Checksum = contentKey.Checksum
+            };
+
+            string keyResp = MakeAPICall("ContentKeys", JsonConvert.SerializeObject(newKey));
+
+            if (!string.IsNullOrEmpty(keyResp))
+            {
+                JObject obj = JObject.Parse(keyResp);
+
+                string keyId = obj["Id"].ToString();
+
+                string addKeyCommand = $"Assets('{Uri.EscapeDataString(asset.Id)}')/$links/ContentKeys";
+
+                string body = JsonConvert.SerializeObject(new { uri = $"{ApiUrl}/ContentKeys('{Uri.EscapeDataString(keyId)}')" });
+
+                // DataServiceVersion: 1.0;NetFx
+                // MaxDataServiceVersion: 3.0; NetFx
+                // TODO: Add extra headers
+                var customHdrs = new Dictionary<string, string>
+                {
+                    ["DataServiceVersion"] = "1.0;NetFx",
+                    ["MaxDataServiceVersion"] = "3.0; NetFx"
+                };
+                string addKeyResp = MakeAPICall(addKeyCommand, body, customHdrs);
+
+                // TODO: Add content key back to asset
+                //var key=asset.ContentKeys.AsEnumerable().FirstOrDefault(k=>k.Id== contentKey.Id);// .Add();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Content Key to be serialised with REST API
+    /// </summary>
+    class ContentKey
+    {
+        //public string Id { get;set;  }
+        public string Name { get; set; }
+        public string ProtectionKeyId { get; set; }
+        public int ContentKeyType { get; set; }
+        public int ProtectionKeyType { get; set; }
+        public string EncryptedContentKey { get; set; }
+        public string Checksum { get; set; }
     }
 }

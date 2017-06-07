@@ -25,9 +25,8 @@ namespace MLSandboxPOC
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
         private readonly string _configuration;
-        private readonly int _numberOfConcurrentTransfers;
+        private readonly int _numberOfConcurrentTasks;
         private readonly string _mediaProcessor;
-        private readonly bool _deleteFiles;
         private readonly FileProcessNotifier _fileProcessedNotifier;
         private readonly IManager<IAsset> _downloadManager;
 
@@ -43,14 +42,14 @@ namespace MLSandboxPOC
             string configuration,
             FileProcessNotifier fileProcessedNotifier,
             IManager<IAsset> downloadManager,
-            int numberOfConcurrentTransfers,
+            int numberOfConcurrentTasks,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview,
             bool deleteFiles = true)
         {
             Debug.Assert(_instance == null);
             if (_instance == null)
             {
-                _instance = new IndexingJobManager(context, configuration, fileProcessedNotifier, downloadManager, numberOfConcurrentTransfers, mediaProcessor, deleteFiles);
+                _instance = new IndexingJobManager(context, configuration, fileProcessedNotifier, downloadManager, numberOfConcurrentTasks, mediaProcessor);
             }
             return _instance;
         }
@@ -59,18 +58,18 @@ namespace MLSandboxPOC
             string configuration,
             FileProcessNotifier fileProcessedNotifier,
             IManager<IAsset> downloadManager,
-            int numberOfConcurrentTransfers,
-            string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview,
-            bool deleteFiles = true)
+            int numberOfConcurrentTasks,
+            string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
             _context = context;
             _configuration = configuration;
             _fileProcessedNotifier = fileProcessedNotifier;
             _downloadManager = downloadManager;
-            _numberOfConcurrentTransfers = numberOfConcurrentTransfers;
+            _numberOfConcurrentTasks = numberOfConcurrentTasks;
             _mediaProcessor = mediaProcessor;
-            _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<IndexingJobManager>();
+
+            _logger.Information("Number of concurrent upload/job tasks: {numberOfConcurrentTasks}", _numberOfConcurrentTasks);
 
             SetMediaReservedUnits();
 
@@ -84,7 +83,7 @@ namespace MLSandboxPOC
             encodingS1ReservedUnit.Update();
             _logger.Verbose("Reserved Unit Type: {ReservedUnitType}", encodingS1ReservedUnit.ReservedUnitType);
 
-            encodingS1ReservedUnit.CurrentReservedUnits = _numberOfConcurrentTransfers;
+            encodingS1ReservedUnit.CurrentReservedUnits = _numberOfConcurrentTasks;
             encodingS1ReservedUnit.Update();
 
             _logger.Verbose("Number of reserved units: {currentReservedUnits}", encodingS1ReservedUnit.CurrentReservedUnits);
@@ -104,7 +103,7 @@ namespace MLSandboxPOC
 
                     _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
 
-                    while (_currentTasks.Count < _numberOfConcurrentTransfers && _fileNames.Count > 0)
+                    while (_currentTasks.Count < _numberOfConcurrentTasks && _fileNames.Count > 0)
                     {
                         string inputFile;
                         if (_fileNames.TryDequeue(out inputFile))

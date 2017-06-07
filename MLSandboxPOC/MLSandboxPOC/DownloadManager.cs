@@ -14,8 +14,7 @@ namespace MLSandboxPOC
     {
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
-        private readonly string _outputDirectory;
-        private readonly int _numberOfConcurrentTransfers;
+        private readonly int _numberOfConcurrentTasks;
         private readonly bool _deleteFiles;
 
         private readonly ConcurrentQueue<IAsset> _assets = new ConcurrentQueue<IAsset>();
@@ -27,28 +26,26 @@ namespace MLSandboxPOC
         private static DownloadManager _instance;
 
         public static DownloadManager CreateDownloadManager(CloudMediaContext context,
-            string outputDirectory,
-            int numberOfConcurrentTransfers,
-            bool deleteFiles = true)
+            int numberOfConcurrentDownloads)
         {
             Debug.Assert(_instance == null);
             if (_instance == null)
             {
-                _instance = new DownloadManager(context, outputDirectory, numberOfConcurrentTransfers, deleteFiles);
+                _instance = new DownloadManager(context, numberOfConcurrentDownloads);
             }
             return _instance;
         }
 
         private DownloadManager(CloudMediaContext context,
-            string outputDirectory,
-            int numberOfConcurrentTransfers,
+            int numberOfConcurrentDownloads,
             bool deleteFiles = true)
         {
             _context = context;
-            _outputDirectory = outputDirectory;
-            _numberOfConcurrentTransfers = numberOfConcurrentTransfers;
+            _numberOfConcurrentTasks = numberOfConcurrentDownloads;
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<DownloadManager>();
+
+            _logger.Information("Number of concurrent download tasks: {numberOfConcurrentTasks}", _numberOfConcurrentTasks);
 
             _processTask = ProcessTasks();
         }
@@ -63,7 +60,7 @@ namespace MLSandboxPOC
                  {
                      _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
 
-                     while (_currentTasks.Count < _numberOfConcurrentTransfers && _assets.Count > 0)
+                     while (_currentTasks.Count < _numberOfConcurrentTasks && _assets.Count > 0)
                      {
                          IAsset assetToDownload;
                          if (_assets.TryDequeue(out assetToDownload))
@@ -151,8 +148,8 @@ namespace MLSandboxPOC
                     //{
                     _logger.Information("Downloading {file}", file.ToLog());
 
-                    //await file.DownloadAsync(Path.Combine(_outputDirectory, file.Name), _blobClient, asset.Locators[0], CancellationToken.None);
-                    file.Download(Path.Combine(_outputDirectory, file.Name));
+                    //await file.DownloadAsync(Path.Combine(Config.Instance.OutputDirectory, file.Name), _blobClient, asset.Locators[0], CancellationToken.None);
+                    file.Download(Path.Combine(Config.Instance.OutputDirectory, file.Name));
 
                     if (_deleteFiles)
                     {

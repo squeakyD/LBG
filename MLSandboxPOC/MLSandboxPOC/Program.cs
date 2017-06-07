@@ -1,30 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
 using System.Linq;
 using Microsoft.WindowsAzure.MediaServices.Client;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Serilog;
 
 namespace MLSandboxPOC
 {
     class Program
     {
-        // Read values from the App.config file.
-        //private static readonly string _mediaServicesAccountName = ConfigurationManager.AppSettings["MediaServicesAccountName"];
-        //private static readonly string _mediaServicesAccountKey = ConfigurationManager.AppSettings["MediaServicesAccountKey"];
-        private static readonly string _sourceDir = ConfigurationManager.AppSettings["SourceDirectory"];
-        private static readonly string _processedDirectory = ConfigurationManager.AppSettings["ProcessedDirectory"];
-        private static readonly string _outDir = ConfigurationManager.AppSettings["OutputDirectory"];
-
         // Field for service context.
         private static CloudMediaContext _context = null;
         private static MediaServicesCredentials _cachedCredentials = null;
+        private const int DefaultConnectionLimitMultiplier = 8;
 
         private static ILogger _logger;
-        private static MSRestClient _restClient;
+        //private static MSRestClient _restClient;
         private static IndexingJobManager _indexingJobManager;
         private static DownloadManager _downloadManager;
 
@@ -40,10 +31,7 @@ namespace MLSandboxPOC
                 Console.WriteLine("==============");
                 Console.WriteLine();
 
-                CreateCredentials();
-
-                // Used the cached credentials to create CloudMediaContext.
-                _context = new CloudMediaContext(_cachedCredentials);
+                InitialiseMediaServicesClient();
 
                 //string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009249280 040417_1.wav");
@@ -71,18 +59,16 @@ namespace MLSandboxPOC
                     //}
                 }
 
-                _context.NumberOfConcurrentTransfers = 25;
+                //_restClient = new MSRestClient(_cachedCredentials);
 
-                _restClient = new MSRestClient(_cachedCredentials);
-
-                _downloadManager = DownloadManager.CreateDownloadManager(_context, _outDir, _context.NumberOfConcurrentTransfers);
+                _downloadManager = DownloadManager.CreateDownloadManager(_context, Config.Instance.NumberOfConcurrentDownloads);
 
                 var fileProcessNotifier = FileProcessNotifier.Instance;
 
                 string configuration = File.ReadAllText("config.json");
-                _indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_context, configuration, fileProcessNotifier, _downloadManager, _context.NumberOfConcurrentTransfers);
+                _indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_context, configuration, fileProcessNotifier, _downloadManager, Config.Instance.NumberOfConcurrentUploads);
 
-                var fileMgr = FileSourceManager.CreateFileSourceManager(_sourceDir, _processedDirectory, _indexingJobManager, fileProcessNotifier);
+                var fileMgr = FileSourceManager.CreateFileSourceManager(_indexingJobManager, fileProcessNotifier);
 
                 Console.WriteLine("Started filewatcher");
                 Console.WriteLine("-> Press any key to exit");
@@ -107,6 +93,36 @@ namespace MLSandboxPOC
             {
                 _logger.Error(ex, "Fatal error in demo program!!!");
             }
+        }
+
+        private static void InitialiseMediaServicesClient()
+        {
+            CreateCredentials();
+
+            // Used the cached credentials to create CloudMediaContext.
+            _context = new CloudMediaContext(_cachedCredentials);
+
+            if (!Config.Instance.UseDefaultNumberOfConcurrentTransfers)
+            {
+                _context.NumberOfConcurrentTransfers = Config.Instance.NumberOfConcurrentTransfers;
+            }
+            else
+            {
+                _logger.Information("Using default SDK value for NumberOfConcurrentTransfers");
+            }
+
+            if (!Config.Instance.UseDefaultParallelTransferThreadCount)
+            {
+                _context.ParallelTransferThreadCount = Config.Instance.ParallelTransferThreadCount;
+            }
+            else
+            {
+                _logger.Information("Using default SDK value for ParallelTransferThreadCount");
+            }
+
+            _logger.Information(
+                "NumberOfConcurrentTransfers: {NumberOfConcurrentTransfers}, ParallelTransferThreadCount: {ParallelTransferThreadCount}",
+                _context.NumberOfConcurrentTransfers, _context.ParallelTransferThreadCount);
         }
 
         //private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
@@ -158,8 +174,8 @@ namespace MLSandboxPOC
 
         private static IAsset CreateAssetFromFolder()
         {
-            _logger.Debug("Creating asset and uploading all files in {folder}", _sourceDir);
-            var asset = _context.Assets.CreateFromFolder(_sourceDir, AssetCreationOptions.StorageEncrypted);
+            _logger.Debug("Creating asset and uploading all files in {folder}", Config.Instance.SourceDirectory);
+            var asset = _context.Assets.CreateFromFolder(Config.Instance.SourceDirectory, AssetCreationOptions.StorageEncrypted);
 
             // Create a manifest file that contains all the asset file names and upload to storage.
             _logger.Debug("Creating manifest");
@@ -175,173 +191,6 @@ namespace MLSandboxPOC
             return asset;
         }
 
-        //private static List<IContentKey> _savedStorageKeys = new List<IContentKey>();
-
-        private static IContentKey _storedContentKey;
-
-        //static IContentKey CreateCommonTypeContentKey(IAsset asset)
-        //{
-        //    // Create common encryption content key
-        //    Guid keyId = Guid.NewGuid();
-        //    byte[] contentKey = GetRandomBuffer(16);
-
-        //    IContentKey key = _context.ContentKeys.Create(
-        //        keyId,
-        //        contentKey,
-        //        "MyContentKey",
-        //        ContentKeyType.CommonEncryption);
-
-        //    // Associate the key with the asset.
-        //    asset.ContentKeys.Add(key);
-
-        //    _logger.Debug("Created common encryption key {key} for asset {asset}", key.Id, asset.ToLog());
-
-        //    return key;
-        //}
-
-        //private static byte[] GetRandomBuffer(int length)
-        //{
-        //    var returnValue = new byte[length];
-
-        //    using (var rng = new System.Security.Cryptography.RNGCryptoServiceProvider())
-        //    {
-        //        rng.GetBytes(returnValue);
-        //    }
-
-        //    return returnValue;
-        //}
-
-        private static void RemoveEncryptionKey(IAsset asset)
-        {
-            return; // temp
-            _storedContentKey = asset.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
-            asset.ContentKeys.Remove(_storedContentKey);
-            asset.Update();
-            //    //var key=_context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == _storedContentKey.Id);
-            //    //key.Delete();
-            //    _logger.Debug("Removed encryption key {key} from asset {asset}",_storedContentKey.Id, asset.ToLog());
-        }
-
-        class MyContentKey
-        {
-            //public string Id { get;set;  }
-            public string Name { get; set; }
-            public string ProtectionKeyId { get; set; }
-            public int ContentKeyType { get; set; }
-            public int ProtectionKeyType { get; set; }
-            public string EncryptedContentKey { get; set; }
-            public string Checksum { get; set; }
-        }
-
-        private static void RestoreEncryptionKey(IAsset asset)
-        {
-            return; // temp
-            //asset.ContentKeys.Add(_storedContentKey);
-            _logger.Debug("RestoreEncryptionKey: asset {asset}", asset.ToLog());
-            var newKey = new MyContentKey
-            {
-                Name = _storedContentKey.Name,
-                ProtectionKeyId = _storedContentKey.ProtectionKeyId,
-                ContentKeyType = (int) _storedContentKey.ContentKeyType,
-                ProtectionKeyType = (int) _storedContentKey.ProtectionKeyType,
-                EncryptedContentKey = _storedContentKey.EncryptedContentKey,
-                Checksum = _storedContentKey.Checksum
-            };
-
-            string keyResp = _restClient.MakeAPICall("ContentKeys", JsonConvert.SerializeObject(newKey));
-
-            if (!string.IsNullOrEmpty(keyResp))
-            {
-                JObject obj = JObject.Parse(keyResp);
-
-                string keyId = obj["Id"].ToString();
-
-                string addKeyCommand = $"Assets('{Uri.EscapeDataString(asset.Id)}')/$links/ContentKeys";
-
-                string body = JsonConvert.SerializeObject(new {uri = $"{_restClient.ApiUrl}/ContentKeys('{Uri.EscapeDataString(keyId)}')"});
-
-                // DataServiceVersion: 1.0;NetFx
-                // MaxDataServiceVersion: 3.0; NetFx
-                // TODO: Add extra headers
-                var customHdrs = new Dictionary<string, string>
-                {
-                    ["DataServiceVersion"] = "1.0;NetFx",
-                    ["MaxDataServiceVersion"] = "3.0; NetFx"
-                };
-                string addKeyResp = _restClient.MakeAPICall(addKeyCommand, body, customHdrs);
-
-                //var key=asset.ContentKeys.AsEnumerable().FirstOrDefault(k=>k.Id== _storedContentKey.Id);// .Add();
-            }
-        }
-    
-        
-        //private static void RemoveEncryptionKeys(IAsset asset)
-        //{
-        //    bool error = false;
-        //    List<string> KeysListIDs = new List<string>();
-
-        //    try
-        //    {
-        //        var StorageKeys = asset.ContentKeys.Where(k => k.ContentKeyType == ContentKeyType.StorageEncryption).ToList();
-        //        KeysListIDs = StorageKeys.Select(k => k.Id).ToList(); // create a list of IDs
-        //        var cks = _context.ContentKeys.ToArray();   // TEST
-
-        //        // removing key
-        //        foreach (var key in StorageKeys)
-        //        {
-        //            _savedStorageKeys.Add(key);
-        //            asset.ContentKeys.Remove(key);
-        //        }
-
-        //        _logger.Debug("Removed {count} asset keys", StorageKeys.Count);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.Error(ex, "Error deleting storage key from asset");
-        //        error = true;
-        //    }
-        //    if (!error)
-        //    {
-        //        // deleting key
-        //        foreach (var key in _context.ContentKeys.ToList().Where(k => KeysListIDs.Contains(k.Id)).ToList())
-        //        {
-        //            try
-        //            {
-        //                key.Delete();
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                _logger.Error(ex, "Error deleting storage key {id} from CloudMediaContext", key.Id);
-        //            }
-        //        }
-        //    }
-        //}
-
-        static string GuidFromId(string id)
-        {
-            string guid = id.Substring(id.IndexOf("UUID:", StringComparison.OrdinalIgnoreCase) + 5);
-            return guid;
-        }
-
-        //private static void RestoreEncryptionKeys(IAsset asset)
-        //{
-        //    //asset.ContentKeys.Clear();
-
-        //    _savedStorageKeys.ForEach(key =>
-        //    {
-        //        _logger.Debug("Adding key {key} to asset {asset} and context", key.Id, asset.ToLog());
-
-        //        //byte[] rawKey = Convert.FromBase64String(key.EncryptedContentKey);
-        //        //Guid keyId = Guid.NewGuid();
-        //        //_context.ContentKeys.Create(Guid.Parse(GuidFromId(key.Id)), rawKey);//, key.Name, key.ContentKeyType);
-        //        //var newKey= _context.ContentKeys.Create(keyId, rawKey, key.Name, key.ContentKeyType);
-        //        var newKey = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
-        //        //newKey.EncryptedContentKey
-        //        //asset.ContentKeys[0] = key;
-        //        //var ck = _context.ContentKeys.AsEnumerable().FirstOrDefault(k => k.Id == key.Id);
-        //        asset.ContentKeys.Add(newKey);
-        //    });
-        //}            
 
         private static void DeleteAssetFiles()
         {

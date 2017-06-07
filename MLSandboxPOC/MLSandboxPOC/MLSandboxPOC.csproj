@@ -169,7 +169,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ContentKeyExtensions.cs" />
+    <Compile Include="Config.cs" />
     <Compile Include="DownloadManager.cs" />
     <Compile Include="FileProcessNotifier.cs" />
     <Compile Include="FileSourceManager.cs" />
