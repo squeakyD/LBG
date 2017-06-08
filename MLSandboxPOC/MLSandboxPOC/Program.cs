@@ -12,12 +12,9 @@ namespace MLSandboxPOC
         // Field for service context.
         private static CloudMediaContext _context = null;
         private static MediaServicesCredentials _cachedCredentials = null;
-        private const int DefaultConnectionLimitMultiplier = 8;
 
         private static ILogger _logger;
         //private static MSRestClient _restClient;
-        private static IndexingJobManager _indexingJobManager;
-        private static DownloadManager _downloadManager;
 
         static void Main(string[] args)
         {
@@ -61,14 +58,16 @@ namespace MLSandboxPOC
 
                 //_restClient = new MSRestClient(_cachedCredentials);
 
-                _downloadManager = DownloadManager.CreateDownloadManager(_context, Config.Instance.NumberOfConcurrentDownloads);
+                var downloadManager = DownloadManager.CreateDownloadManager(_context, Config.Instance.NumberOfConcurrentDownloads);
 
                 var fileProcessNotifier = FileProcessNotifier.Instance;
 
                 string configuration = File.ReadAllText("config.json");
-                _indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_context, configuration, fileProcessNotifier, _downloadManager, Config.Instance.NumberOfConcurrentUploads);
+                var indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_context, configuration, downloadManager);
 
-                var fileMgr = FileSourceManager.CreateFileSourceManager(_indexingJobManager, fileProcessNotifier);
+                var uploadManager = UploadManager.CreateUploadManager(_context, fileProcessNotifier, indexingJobManager, Config.Instance.NumberOfConcurrentUploads);
+
+                var fileMgr = FileSourceManager.CreateFileSourceManager(uploadManager, fileProcessNotifier);
 
                 Console.WriteLine("Started filewatcher");
                 Console.WriteLine("-> Press any key to exit");
@@ -76,18 +75,20 @@ namespace MLSandboxPOC
                 Console.ReadKey();
 
                 fileMgr.ShutdownTimer();
-                var t1 = _indexingJobManager.WaitForAllTasks();
+                var t1 = uploadManager.WaitForAllTasks();
                 t1.Wait();
-                var t2 = _downloadManager.WaitForAllTasks();
+                var t2 = indexingJobManager.WaitForAllTasks();
                 t2.Wait();
+                var t3 = downloadManager.WaitForAllTasks();
+                t3.Wait();
 
                 // Run indexing job.
-                //_indexingJobManager.QueueItem(src);
-                //_indexingJobManager.QueueItem(src2);
+                //uploadManager.QueueItem(src);
+                //uploadManager.QueueItem(src2);
 
                 // Download the job output asset.
                 //DownloadAsset(asset, _outDir);
-                //_downloadManager.QueueItem(asset);
+                //downloadManager.QueueItem(asset);
             }
             catch (Exception ex)
             {

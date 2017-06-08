@@ -16,24 +16,24 @@ namespace MLSandboxPOC
     class FileSourceManager: IFileProcessedObserver
     {
         private readonly ILogger _logger;
-        private readonly IManager<string> _indexingJobManager;
+        private readonly IManager<string> _uploadManager;
         private readonly Timer _timer;
 
         private static FileSourceManager _instance;
 
         private readonly static object _fileProcessorLock = new object();
 
-        public static FileSourceManager CreateFileSourceManager(IManager<string> indexingJobManager, FileProcessNotifier notifier)
+        public static FileSourceManager CreateFileSourceManager(IManager<string> uploadManager, FileProcessNotifier notifier)
         {
             Debug.Assert(_instance == null);
-            _instance = new FileSourceManager(indexingJobManager);
+            _instance = new FileSourceManager(uploadManager);
             notifier.AddFileObserver(_instance);
             return _instance;
         }
 
-        private FileSourceManager(IManager<string> indexingJobManager)
+        private FileSourceManager(IManager<string> uploadManager)
         {
-            _indexingJobManager = indexingJobManager;
+            _uploadManager = uploadManager;
             _logger = Logger.GetLog<FileSourceManager>();
 
             CheckDirectoriesExist();
@@ -86,7 +86,7 @@ namespace MLSandboxPOC
                     }
 
                     File.Move(filePath, dest);
-                   _indexingJobManager.QueueItem(fileToProcess);
+                   _uploadManager.QueueItem(fileToProcess);
                 }
                 catch (Exception ex)
                 {

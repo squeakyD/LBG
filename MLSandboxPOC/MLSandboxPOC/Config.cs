@@ -24,9 +24,6 @@ namespace MLSandboxPOC
 
         private const int DefFileWatcherInterval = 10;
 
-        // Max Media Services Media Reserved Units for concurrent tasks
-        public const int MaxMediaReservedUnits = 25;
-
         // Copied from Media Services Client SDK (blob updload/download code and CloudMediaContext)
         private const int DefaultConnectionLimitMultiplier = 8;
 
@@ -34,6 +31,8 @@ namespace MLSandboxPOC
         private readonly int DefParallelTransferThreadCount = 10;    // in CloudMediaContext
         private readonly int MaxNumberOfConcurrentTransfers = Environment.ProcessorCount * DefaultConnectionLimitMultiplier;
         private readonly int MaxParallelTransferThreadCount = Environment.ProcessorCount * DefaultConnectionLimitMultiplier;
+
+        private readonly int DefNumberOfConcurrentFileTasks = Environment.ProcessorCount;
 
         private readonly ILogger _logger = Logger.GetLog<Config>();
 
@@ -45,8 +44,8 @@ namespace MLSandboxPOC
         {
             _fileWatcherInterval = GetVal("FileWatcherInterval", DefFileWatcherInterval);
 
-            _numberOfConcurrentUploads = GetVal("NumberOfConcurrentUploads", MaxMediaReservedUnits);
-            _numberOfConcurrentDownloads = GetVal("NumberOfConcurrentDownloads", MaxMediaReservedUnits);
+            _numberOfConcurrentUploads = GetVal("NumberOfConcurrentUploads", DefNumberOfConcurrentFileTasks);
+            _numberOfConcurrentDownloads = GetVal("NumberOfConcurrentDownloads", DefNumberOfConcurrentFileTasks);
 
             _numberOfConcurrentTransfers = GetVal("NumberOfConcurrentTransfers", DefNumberOfConcurrentTransfers, MaxNumberOfConcurrentTransfers);
             _parallelTransferThreadCount = GetVal("ParallelTransferThreadCount", DefParallelTransferThreadCount, MaxParallelTransferThreadCount);

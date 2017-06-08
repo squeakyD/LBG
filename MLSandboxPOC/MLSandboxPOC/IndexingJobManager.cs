@@ -20,56 +20,51 @@ namespace MLSandboxPOC
         void QueueItem(T item);
     }
 
-    class IndexingJobManager : IManager<string>
+    class IndexingJobManager : IManager<IndexJobData>
     {
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
         private readonly string _configuration;
-        private readonly int _numberOfConcurrentTasks;
         private readonly string _mediaProcessor;
-        private readonly FileProcessNotifier _fileProcessedNotifier;
         private readonly IManager<IAsset> _downloadManager;
 
-        private readonly ConcurrentQueue<string> _fileNames = new ConcurrentQueue<string>();
+        private readonly ConcurrentQueue<IndexJobData> _indexJobQueue = new ConcurrentQueue<IndexJobData>();
         private readonly List<Task> _currentTasks = new List<Task>();
         private readonly Task _processTask;
         private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
         private AutoResetEvent _itemsInQueueEvent = new AutoResetEvent(false);
 
+        // Max Media Services Media Reserved Units for concurrent jobs
+        private const int NumMediaReservedUnits = 25;
+
         private static IndexingJobManager _instance;
 
         public static IndexingJobManager CreateIndexingJobManager(CloudMediaContext context,
             string configuration,
-            FileProcessNotifier fileProcessedNotifier,
+            //FileProcessNotifier fileProcessedNotifier,
             IManager<IAsset> downloadManager,
-            int numberOfConcurrentTasks,
-            string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview,
-            bool deleteFiles = true)
+            string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
             Debug.Assert(_instance == null);
             if (_instance == null)
             {
-                _instance = new IndexingJobManager(context, configuration, fileProcessedNotifier, downloadManager, numberOfConcurrentTasks, mediaProcessor);
+                _instance = new IndexingJobManager(context, configuration, downloadManager, mediaProcessor);
             }
             return _instance;
         }
 
         private IndexingJobManager(CloudMediaContext context,
             string configuration,
-            FileProcessNotifier fileProcessedNotifier,
+            //FileProcessNotifier fileProcessedNotifier,
             IManager<IAsset> downloadManager,
-            int numberOfConcurrentTasks,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
             _context = context;
             _configuration = configuration;
-            _fileProcessedNotifier = fileProcessedNotifier;
+            //_fileProcessedNotifier = fileProcessedNotifier;
             _downloadManager = downloadManager;
-            _numberOfConcurrentTasks = numberOfConcurrentTasks;
             _mediaProcessor = mediaProcessor;
             _logger = Logger.GetLog<IndexingJobManager>();
-
-            _logger.Information("Number of concurrent upload/job tasks: {numberOfConcurrentTasks}", _numberOfConcurrentTasks);
 
             SetMediaReservedUnits();
 
@@ -83,13 +78,11 @@ namespace MLSandboxPOC
             encodingS1ReservedUnit.Update();
             _logger.Verbose("Reserved Unit Type: {ReservedUnitType}", encodingS1ReservedUnit.ReservedUnitType);
 
-            encodingS1ReservedUnit.CurrentReservedUnits = _numberOfConcurrentTasks;
+            encodingS1ReservedUnit.CurrentReservedUnits = NumMediaReservedUnits;
             encodingS1ReservedUnit.Update();
 
-            _logger.Verbose("Number of reserved units: {currentReservedUnits}", encodingS1ReservedUnit.CurrentReservedUnits);
+            _logger.Verbose("Number of Media Reserved Units: {currentReservedUnits}", encodingS1ReservedUnit.CurrentReservedUnits);
         }
-
-        //public List<string> UnprocessedFiles => new List<string>();
 
         private Task ProcessTasks()
         {
@@ -103,12 +96,12 @@ namespace MLSandboxPOC
 
                     _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
 
-                    while (_currentTasks.Count < _numberOfConcurrentTasks && _fileNames.Count > 0)
+                    while (_currentTasks.Count < NumMediaReservedUnits && _indexJobQueue.Count > 0)
                     {
-                        string inputFile;
-                        if (_fileNames.TryDequeue(out inputFile))
+                        IndexJobData jobData;
+                        if (_indexJobQueue.TryDequeue(out jobData))
                         {
-                            _currentTasks.Add(RunJob(inputFile));
+                            _currentTasks.Add(RunJob(jobData));
                         }
                     }
 
@@ -119,10 +112,10 @@ namespace MLSandboxPOC
             return task;
         }
 
-        public void QueueItem(string fileName)
+        public void QueueItem(IndexJobData data)
         {
-            _logger.Debug("Queueing {file}", fileName);
-            _fileNames.Enqueue(fileName);
+            _logger.Debug("Queueing job for {file}", data.Filename);
+            _indexJobQueue.Enqueue(data);
             _itemsInQueueEvent.Set();
         }
 
@@ -133,7 +126,7 @@ namespace MLSandboxPOC
                 _logger.Information("Waiting for all outstanding indexing jobs to complete");
                 int numItems = 0;
 
-                numItems = _fileNames.Count;
+                numItems = _indexJobQueue.Count;
 
                 int oldNumItems = numItems + 1;
                 while (numItems > 0)
@@ -145,7 +138,7 @@ namespace MLSandboxPOC
                     }
                     Thread.Sleep(1000);
 
-                    numItems = _fileNames.Count;
+                    numItems = _indexJobQueue.Count;
                 }
 
                 _logger.Debug("Waiting for remaining indexing tasks");
@@ -175,12 +168,11 @@ namespace MLSandboxPOC
             });
         }
 
-        //private Task<IAsset> RunJob(string fileName)
-        private Task RunJob(string fileName)
+        private Task RunJob(IndexJobData jobData)
         {
             return Task.Run(() =>
                 {
-                    var job = new IndexingJob(_context, _fileProcessedNotifier, fileName, _configuration, _mediaProcessor);
+                    var job = new IndexingJob(_context, jobData, _configuration, _mediaProcessor);
                     try
                     {
                         var outputAsset = job.Run();
@@ -189,7 +181,7 @@ namespace MLSandboxPOC
                     catch (Exception ex)
                     {
                         // In the event of an error, abort this job, but catch the exception so that other jobs can complete
-                        _logger.Error(ex, "Error uploading/indexing {file}", fileName);
+                        _logger.Error(ex, "Error indexing {file}", jobData.Filename);
                     }
                     finally
                     {

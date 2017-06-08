@@ -177,9 +177,11 @@
     <Compile Include="IndexingJobManager.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="LoggerExtensions.cs" />
+    <Compile Include="MediaServicesUtils.cs" />
     <Compile Include="MSRestClient.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UploadManager.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config">

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,30 +12,30 @@ namespace MLSandboxPOC
     {
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
-        private readonly FileProcessNotifier _fileProcessedNotifier;
-        private readonly string _filePath;
+        //private readonly FileProcessNotifier _fileProcessedNotifier;
+        private readonly IndexJobData _jobData;
         private readonly string _configuration;
         private readonly string _mediaProcessor;
         private readonly bool _deleteFiles;
 
-        private IAsset _asset;
-        private IContentKey _storedContentKey;
-        private byte[] _storedKeyData;
+        //private IAsset _asset;
+        //private IContentKey _storedContentKey;
+        //private byte[] _storedKeyData;
         //private IAccessPolicy _accessPolicy;
-        private const string KeyIdentifierPrefix = "nb:kid:UUID:";
+        //private const string KeyIdentifierPrefix = "nb:kid:UUID:";
 
-        private static object _assetsLock = new object();
+        //private static object _assetsLock = new object();
         private static object _jobsLock = new object();
         //private static object _tasksLock = new object();
 
         public IndexingJob(CloudMediaContext context,
-            FileProcessNotifier fileProcessedNotifier, 
-            string filePath, string configuration,
+            //FileProcessNotifier fileProcessedNotifier, 
+            IndexJobData jobData, string configuration,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview, bool deleteFiles = true)
         {
             _context = context;
-            _fileProcessedNotifier = fileProcessedNotifier;
-            _filePath = filePath;
+            //_fileProcessedNotifier = fileProcessedNotifier;
+            _jobData = jobData;
             _configuration = configuration;
             _mediaProcessor = mediaProcessor;
             _deleteFiles = deleteFiles;
@@ -43,22 +44,24 @@ namespace MLSandboxPOC
 
         public IAsset Run()
         {
-            _logger.Information("Running index job for {file}, using  Indexer {mediaProcessor}", _filePath, _mediaProcessor);
+            _logger.Information("Running index job for {file}, using  Indexer {mediaProcessor}", _jobData, _mediaProcessor);
 
-            _asset = CreateAssetAndUploadSingleFile(AssetCreationOptions.StorageEncrypted);
+           // _asset = CreateAssetAndUploadSingleFile(AssetCreationOptions.StorageEncrypted);
 
             _logger.Debug("Creating job");
 
             var processor = _context.MediaProcessors.GetLatestMediaProcessorByName(_mediaProcessor);
+
+            string file = Path.GetFileName(_jobData.Filename);
 
             IJob job;
             ITask task;
 
             lock (_jobsLock)
             {
-                job = _context.Jobs.Create($"Indexing Job:{_filePath}");
+                job = _context.Jobs.Create($"Indexing Job:{file}");
 
-                task = job.Tasks.AddNew($"Indexing Task:{_filePath}",
+                task = job.Tasks.AddNew($"Indexing Task:{file}",
                     processor,
                     _configuration,
                     TaskOptions.None);
@@ -66,10 +69,10 @@ namespace MLSandboxPOC
 
             _logger.Debug("Created task {task} for job", task.ToLog());
 
-            task.InputAssets.Add(_asset);
+            task.InputAssets.Add(_jobData.InputAsset);
 
             // Add an output asset to contain the results of the job.
-            task.OutputAssets.AddNew($"Indexing Output for {_filePath}", AssetCreationOptions.StorageEncrypted);
+            task.OutputAssets.AddNew($"Indexing Output for {file}", AssetCreationOptions.StorageEncrypted);
 
             job.StateChanged += StateChanged;
             job.Submit();
@@ -92,57 +95,57 @@ namespace MLSandboxPOC
             var elapsed = job.EndTime - job.StartTime;
 
             _logger.Information("-> Indexing job for {file} took {elapsed} seconds (processor={processor})",
-                _filePath, elapsed?.TotalSeconds ?? 0, _mediaProcessor);
+                _jobData, elapsed?.TotalSeconds ?? 0, _mediaProcessor);
 
             //_context.Locators.CreateLocator(LocatorType.Sas, job.OutputMediaAssets[0], _accessPolicy);
 
             return job.OutputMediaAssets[0];
         }
 
-        private IAsset CreateAssetAndUploadSingleFile(AssetCreationOptions options)
-        {
-            IAsset asset;
+        //private IAsset CreateAssetAndUploadSingleFile(AssetCreationOptions options)
+        //{
+        //    IAsset asset;
 
-            lock (_assetsLock)
-            {
-                asset = _context.Assets.CreateFromFile(_filePath, options);
-                _logger.Information("Created and uploaded asset {asset} from {file}", asset.ToLog(), _filePath);
-            }
+        //    lock (_assetsLock)
+        //    {
+        //        asset = _context.Assets.CreateFromFile(_jobData, options);
+        //        _logger.Information("Created and uploaded asset {asset} from {file}", asset.ToLog(), _jobData);
+        //    }
 
-            RemoveEncryptionKey(asset);
+        //    RemoveEncryptionKey(asset);
 
-            _fileProcessedNotifier.NotifyFileProcessed(_filePath);
+        //    _fileProcessedNotifier.NotifyFileProcessed(_jobData);
 
-            // TEST
-            //RestoreEncryptionKey(asset);
+        //    // TEST
+        //    //RestoreEncryptionKey(asset);
 
-            //var test = asset.ContentKeys;
-            return asset;
-        }
+        //    //var test = asset.ContentKeys;
+        //    return asset;
+        //}
+//
+      //private void RemoveEncryptionKey(IAsset asset)
+      //  {
+      //      _storedContentKey = asset.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+      //      _storedKeyData = _storedContentKey.GetClearKeyValue();
+      //      asset.ContentKeys.Remove(_storedContentKey);
+      //      asset.Update();
+//
+      //      _logger.Verbose("Removed encryption key {key} from asset {asset}", _storedContentKey.Id, asset.ToLog());
+      //  }
 
-      private void RemoveEncryptionKey(IAsset asset)
-        {
-            _storedContentKey = asset.ContentKeys.AsEnumerable().FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
-            _storedKeyData = _storedContentKey.GetClearKeyValue();
-            asset.ContentKeys.Remove(_storedContentKey);
-            asset.Update();
+      //  static string GuidFromId(string id)
+      //  {
+      //      string guid = id.Substring(id.IndexOf(KeyIdentifierPrefix, StringComparison.OrdinalIgnoreCase) + KeyIdentifierPrefix.Length);
+      //      return guid;
+      //  }
+//
+      //  private void RestoreEncryptionKey(IAsset asset)
+      //  {
+      //      _logger.Verbose("Restoring key {key} to asset {asset}", _storedContentKey.Id, asset.ToLog());
 
-            _logger.Verbose("Removed encryption key {key} from asset {asset}", _storedContentKey.Id, asset.ToLog());
-        }
-
-        static string GuidFromId(string id)
-        {
-            string guid = id.Substring(id.IndexOf(KeyIdentifierPrefix, StringComparison.OrdinalIgnoreCase) + KeyIdentifierPrefix.Length);
-            return guid;
-        }
-
-        private void RestoreEncryptionKey(IAsset asset)
-        {
-            _logger.Verbose("Restoring key {key} to asset {asset}", _storedContentKey.Id, asset.ToLog());
-
-            var newKey= _context.ContentKeys.Create(Guid.Parse(GuidFromId(_storedContentKey.Id)), _storedKeyData, _storedContentKey.Name, _storedContentKey.ContentKeyType);
-            asset.ContentKeys.Add(newKey);
-        }
+      //      var newKey= _context.ContentKeys.Create(Guid.Parse(GuidFromId(_storedContentKey.Id)), _storedKeyData, _storedContentKey.Name, _storedContentKey.ContentKeyType);
+      //      asset.ContentKeys.Add(newKey);
+      //  }
 
         private void StateChanged(object sender, JobStateChangedEventArgs e)
         {
@@ -170,7 +173,7 @@ namespace MLSandboxPOC
                     Console.WriteLine("Please wait...");
                     break;
                 case JobState.Processing:
-                    RestoreEncryptionKey(asset);
+                    MediaServicesUtils.RestoreEncryptionKey(_context, _jobData);
                     Console.WriteLine("Please wait...");
                     //if (_deleteFiles)
                     //{
@@ -192,17 +195,19 @@ namespace MLSandboxPOC
 
         public void DeleteAsset()
         {
-            if (_asset != null)
-            {
-                foreach (IAssetFile file in _asset.AssetFiles)
-                {
-                    _logger.Verbose("Deleting file {file} in asset {asset}", file.ToLog(), _asset.ToLog());
-                    file.Delete();
-                }
-                _logger.Verbose("Deleting asset {asset}", _asset.ToLog());
-                _asset.Delete();
-                _asset = null;
-            }
+            //if (_asset != null)
+            //{
+            //    foreach (IAssetFile file in _asset.AssetFiles)
+            //    {
+            //        _logger.Verbose("Deleting file {file} in asset {asset}", file.ToLog(), _asset.ToLog());
+            //        file.Delete();
+            //    }
+            //    _logger.Verbose("Deleting asset {asset}", _asset.ToLog());
+            //    _asset.Delete();
+            //    _asset = null;
+            //}
+            MediaServicesUtils.DeleteAsset(_jobData.InputAsset);
+            _jobData.InputAsset = null;
         }
     }
 }
