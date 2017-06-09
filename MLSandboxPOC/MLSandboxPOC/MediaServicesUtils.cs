@@ -14,18 +14,53 @@ namespace MLSandboxPOC
 
         private static readonly ILogger _logger = Logger.GetLog<MediaServicesUtils>();
 
-        private static readonly object _contentKeyLock = new object();
+        //private static readonly object _contentKeyLock = new object();
 
         public static void RemoveEncryptionKey(IndexJobData data)
         {
-            lock (_contentKeyLock)
-            {
-                data.ContentKey = data.InputAsset.ContentKeys.AsEnumerable()
+            //lock (_contentKeyLock)
+            //{
+            data.ContentKey = data.InputAsset.ContentKeys.AsEnumerable()
+                .FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+            data.ContentKeyData = data.ContentKey.GetClearKeyValue();
+            data.InputAsset.ContentKeys.Remove(data.ContentKey);
+            data.InputAsset.Update();
+            //}
+
+            _logger.Verbose("Removed encryption key {key} from asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
+        }
+
+        public static void RemoveEncryptionKey(CloudMediaContext context, IndexJobData data)
+        {
+            //lock (_contentKeyLock)
+            //{
+            int c1 = context.ContentKeys.AsEnumerable().Count(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+
+                 data.ContentKey = data.InputAsset.ContentKeys.AsEnumerable()
                     .FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
                 data.ContentKeyData = data.ContentKey.GetClearKeyValue();
                 data.InputAsset.ContentKeys.Remove(data.ContentKey);
                 data.InputAsset.Update();
-            }
+            //context.ContentKeys
+            //var newKey = context.ContentKeys.Create(Guid.Parse(GuidFromId(data.ContentKey.Id)), data.ContentKeyData, data.ContentKey.Name, data.ContentKey.ContentKeyType);
+            //data.ContentKey= newKey;
+            //}
+
+            int c2 = context.ContentKeys.AsEnumerable().Count(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+            var ck = context.ContentKeys.Where(k => k.Id == data.ContentKey.Id).ToArray();
+
+            //foreach (var key in context.ContentKeys.ToList().Where(k => KeysListIDs.Contains(k.Id)).ToList())
+            //{
+            //    //try
+            //    //{
+            //        key.Delete();
+            //    //}
+            //    //catch (Exception e)
+            //    //{
+
+            //    //    Error = true;
+            //    //}
+            //}
 
             _logger.Verbose("Removed encryption key {key} from asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
         }
@@ -35,12 +70,12 @@ namespace MLSandboxPOC
         {
             _logger.Verbose("Restoring key {key} to asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
 
-            lock (_contentKeyLock)
-            {
+            //lock (_contentKeyLock)
+            //{
                 var newKey = context.ContentKeys.Create(Guid.Parse(GuidFromId(data.ContentKey.Id)), data.ContentKeyData, data.ContentKey.Name,
                     data.ContentKey.ContentKeyType);
                 data.InputAsset.ContentKeys.Add(newKey);
-            }
+            //}
         }
 
         public static void DeleteAsset(IAsset asset)

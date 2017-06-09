@@ -21,7 +21,7 @@ namespace MLSandboxPOC
 
     class UploadManager : IManager<string>
     {
-        private readonly CloudMediaContext _context;
+        private readonly MediaServicesCredentials _credentials;
         private readonly FileProcessNotifier _fileProcessedNotifier;
         private readonly IManager<IndexJobData> _indexingManager;
         private readonly int _numberOfConcurrentTasks;
@@ -36,22 +36,22 @@ namespace MLSandboxPOC
 
         private static UploadManager _instance;
 
-        public static UploadManager CreateUploadManager(CloudMediaContext context, FileProcessNotifier fileProcessedNotifier,
+        public static UploadManager CreateUploadManager(MediaServicesCredentials creds, FileProcessNotifier fileProcessedNotifier,
             IManager<IndexJobData> indexingManager,
             int numberOfConcurrentTasks)
         {
             Debug.Assert(_instance == null);
             if (_instance == null)
             {
-                _instance = new UploadManager(context, fileProcessedNotifier, indexingManager, numberOfConcurrentTasks);
+                _instance = new UploadManager(creds, fileProcessedNotifier, indexingManager, numberOfConcurrentTasks);
             }
             return _instance;
         }
 
-        private UploadManager(CloudMediaContext context, FileProcessNotifier fileProcessedNotifier, IManager<IndexJobData> indexingManager,
+        private UploadManager(MediaServicesCredentials creds, FileProcessNotifier fileProcessedNotifier, IManager<IndexJobData> indexingManager,
             int numberOfConcurrentTasks)
         {
-            _context = context;
+            _credentials = creds;
             _fileProcessedNotifier = fileProcessedNotifier;
             _indexingManager = indexingManager;
             _numberOfConcurrentTasks = numberOfConcurrentTasks;
@@ -95,7 +95,8 @@ namespace MLSandboxPOC
             {
                 try
                 {
-                    var data = CreateAssetAndUploadSingleFile(fileName, AssetCreationOptions.StorageEncrypted);
+                    var context = new CloudMediaContext(_credentials);
+                    var data = CreateAssetAndUploadSingleFile(context, fileName, AssetCreationOptions.StorageEncrypted);
                     _indexingManager.QueueItem(data);
                 }
                 catch (Exception ex)
@@ -106,7 +107,7 @@ namespace MLSandboxPOC
             });
         }
 
-        private IndexJobData CreateAssetAndUploadSingleFile(string filePath, AssetCreationOptions options)
+        private IndexJobData CreateAssetAndUploadSingleFile(CloudMediaContext context, string filePath, AssetCreationOptions options)
         {
             //IAsset asset;
             var data = new IndexJobData {Filename = filePath};
@@ -115,11 +116,14 @@ namespace MLSandboxPOC
             {
                 lock (_assetsLock)
                 {
-                    data.InputAsset = _context.Assets.CreateFromFile(filePath, options);
+                    data.InputAsset = context.Assets.CreateFromFile(filePath, options);
                     _logger.Information("Created and uploaded asset {asset} from {file}", data.InputAsset.ToLog(), filePath);
                 }
 
-                MediaServicesUtils.RemoveEncryptionKey(data);
+                //MediaServicesUtils.RemoveEncryptionKey(context, data);
+                RemoveEncryptionKey(data);
+                // var ck = context.ContentKeys.Where(k => k.ContentKeyType == ContentKeyType.StorageEncryption && k.Id==data.ContentKey.Id).ToArray();
+                MediaServicesUtils.RestoreEncryptionKey(context, data);
 
                 _fileProcessedNotifier.NotifyFileProcessed(filePath);
             }
@@ -136,6 +140,19 @@ namespace MLSandboxPOC
 
             //var test = asset.ContentKeys;
             return data;
+        }
+        private void RemoveEncryptionKey(IndexJobData data)
+        {
+            //lock (_contentKeyLock)
+            //{
+            data.ContentKey = data.InputAsset.ContentKeys.AsEnumerable()
+                .FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+            data.ContentKeyData = data.ContentKey.GetClearKeyValue();
+            data.InputAsset.ContentKeys.Remove(data.ContentKey);
+            data.InputAsset.Update();
+            //}
+
+            _logger.Verbose("Removed encryption key {key} from asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
         }
 
         public Task WaitForAllTasks()

@@ -65,7 +65,15 @@ namespace MLSandboxPOC
 
         private void _timer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            CheckSourceDirectory();
+            _timer.Enabled = false;
+            try
+            {
+                CheckSourceDirectory();
+            }
+            finally
+            {
+                _timer.Enabled = true;
+            }
         }
 
         private void CheckSourceDirectory()

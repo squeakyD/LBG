@@ -63,9 +63,9 @@ namespace MLSandboxPOC
                 var fileProcessNotifier = FileProcessNotifier.Instance;
 
                 string configuration = File.ReadAllText("config.json");
-                var indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_context, configuration, downloadManager);
+                var indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_cachedCredentials, configuration, downloadManager);
 
-                var uploadManager = UploadManager.CreateUploadManager(_context, fileProcessNotifier, indexingJobManager, Config.Instance.NumberOfConcurrentUploads);
+                var uploadManager = UploadManager.CreateUploadManager(_cachedCredentials, fileProcessNotifier, indexingJobManager, Config.Instance.NumberOfConcurrentUploads);
 
                 var fileMgr = FileSourceManager.CreateFileSourceManager(uploadManager, fileProcessNotifier);
 

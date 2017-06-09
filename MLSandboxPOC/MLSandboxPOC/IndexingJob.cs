@@ -12,6 +12,8 @@ namespace MLSandboxPOC
     {
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
+
+        private readonly MediaServicesCredentials _credentials;
         //private readonly FileProcessNotifier _fileProcessedNotifier;
         private readonly IndexJobData _jobData;
         private readonly string _configuration;
@@ -28,18 +30,19 @@ namespace MLSandboxPOC
         private static object _jobsLock = new object();
         //private static object _tasksLock = new object();
 
-        public IndexingJob(CloudMediaContext context,
+        public IndexingJob(MediaServicesCredentials creds,
             //FileProcessNotifier fileProcessedNotifier, 
             IndexJobData jobData, string configuration,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview, bool deleteFiles = true)
         {
-            _context = context;
             //_fileProcessedNotifier = fileProcessedNotifier;
             _jobData = jobData;
             _configuration = configuration;
             _mediaProcessor = mediaProcessor;
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<IndexingJob>();
+            _context = new CloudMediaContext(creds);
+            _credentials = creds;
         }
 
         public IAsset Run()
@@ -173,8 +176,11 @@ namespace MLSandboxPOC
                     Console.WriteLine("Please wait...");
                     break;
                 case JobState.Processing:
+                   // var ctx=new CloudMediaContext(_credentials);
                     MediaServicesUtils.RestoreEncryptionKey(_context, _jobData);
+                    //RestoreEncryptionKey(_context, _jobData);
                     Console.WriteLine("Please wait...");
+                    //_jobData.InputAsset.ContentKeys.Add(_jobData.ContentKey);
                     //if (_deleteFiles)
                     //{
                     //    DeleteAsset();
@@ -192,6 +198,17 @@ namespace MLSandboxPOC
                     break;
             }
         }
+
+        //private void RestoreEncryptionKey(CloudMediaContext context, IndexJobData data)
+        //{
+        //    _logger.Verbose("Restoring key {key} to asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
+
+        //    var newKey = context.ContentKeys.Create(Guid.Parse(MediaServicesUtils.GuidFromId(data.ContentKey.Id)), data.ContentKeyData,
+        //        data.ContentKey.Name,
+        //        data.ContentKey.ContentKeyType);
+        //    data.InputAsset.ContentKeys.Add(newKey);
+        //}
+
 
         public void DeleteAsset()
         {
