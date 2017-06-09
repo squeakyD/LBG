@@ -10,14 +10,14 @@ using System.Diagnostics;
 
 namespace MLSandboxPOC
 {
-    class DownloadManager : IManager<IAsset>
+    class DownloadManager : IManager<IndexJobData>
     {
         private readonly ILogger _logger;
         private readonly CloudMediaContext _context;
         private readonly int _numberOfConcurrentTasks;
         private readonly bool _deleteFiles;
 
-        private readonly ConcurrentQueue<IAsset> _assets = new ConcurrentQueue<IAsset>();
+        private readonly ConcurrentQueue<IndexJobData> _assets = new ConcurrentQueue<IndexJobData>();
         private readonly List<Task> _currentTasks = new List<Task>();
         private readonly Task _processTask;
         private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
@@ -62,10 +62,10 @@ namespace MLSandboxPOC
 
                      while (_currentTasks.Count < _numberOfConcurrentTasks && _assets.Count > 0)
                      {
-                         IAsset assetToDownload;
-                         if (_assets.TryDequeue(out assetToDownload))
+                         IndexJobData data;
+                         if (_assets.TryDequeue(out data))
                          {
-                             _currentTasks.Add(Task.Run(() => DoDownloadAsset(assetToDownload)));
+                             _currentTasks.Add(Task.Run(() => DoDownloadAsset(data)));
                          }
                      }
 
@@ -76,10 +76,10 @@ namespace MLSandboxPOC
             return task;
         }
 
-        public void QueueItem(IAsset asset)
+        public void QueueItem(IndexJobData jobData)
         {
             _logger.Debug("QueueItem");
-            _assets.Enqueue(asset);
+            _assets.Enqueue(jobData);
         }
 
         public Task WaitForAllTasks()
@@ -134,15 +134,15 @@ namespace MLSandboxPOC
 
         }
 
-        private async Task DoDownloadAsset(IAsset asset)
+        private async Task DoDownloadAsset(IndexJobData data)
         {
-            _logger.Information("Downloading files from asset {asset}", asset.ToLog());
+            _logger.Information("Downloading files from asset {asset}", data.OutputAsset.ToLog());
 
             try
             {
                 //List<Task> tasks = new List<Task>();
 
-                foreach (IAssetFile file in asset.AssetFiles)
+                foreach (IAssetFile file in data.OutputAsset.AssetFiles)
                 {
                     //var task = Task.Run(async () =>
                     //{
@@ -151,12 +151,8 @@ namespace MLSandboxPOC
                     //await file.DownloadAsync(Path.Combine(Config.Instance.OutputDirectory, file.Name), _blobClient, asset.Locators[0], CancellationToken.None);
                     file.Download(Path.Combine(Config.Instance.OutputDirectory, file.Name));
 
-                    if (_deleteFiles)
-                    {
-                        _logger.Debug("Deleting output file {file} in asset {asset}", file.ToLog(), asset.ToLog());
-                        //await file.DeleteAsync();
-                        file.Delete();
-                    }
+                    _logger.Debug("Deleting output file {file} in asset {asset}", file.ToLog(), data.OutputAsset.ToLog());
+                    await file.DeleteAsync();
                     //});
                     //
                     //tasks.Add(task);
@@ -165,15 +161,16 @@ namespace MLSandboxPOC
                 //// TODO: try/catch here - https://msdn.microsoft.com/en-us/library/dd537614(v=vs.110).aspx
                 //Task.WaitAll(tasks.ToArray());
 
-                if (_deleteFiles)
-                {
-                    _logger.Debug("Deleting output asset {asset}", asset.ToLog());
-                    await asset.DeleteAsync();
-                }
+                _logger.Debug("Deleting output asset {asset}", data.OutputAsset.ToLog());
+                await data.OutputAsset.DeleteAsync();
+
+                data.OutputAssetDeleted = DateTime.Now;
+
+                ResultsLogger.Instance.WriteResults(data);
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error occurred downloading files from asset {asset}", asset.ToLog());
+                _logger.Error(ex, "Error occurred downloading files from asset {asset}", data.OutputAsset.ToLog());
             }
         }
     }

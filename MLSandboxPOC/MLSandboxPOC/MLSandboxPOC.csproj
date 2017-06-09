@@ -175,12 +175,14 @@
     <Compile Include="FileSourceManager.cs" />
     <Compile Include="IndexingJob.cs" />
     <Compile Include="IndexingJobManager.cs" />
+    <Compile Include="IndexJobData.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="LoggerExtensions.cs" />
     <Compile Include="MediaServicesUtils.cs" />
     <Compile Include="MSRestClient.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ResultsLogger.cs" />
     <Compile Include="UploadManager.cs" />
   </ItemGroup>
   <ItemGroup>

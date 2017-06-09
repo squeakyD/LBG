@@ -11,14 +11,6 @@ using Serilog;
 
 namespace MLSandboxPOC
 {
-    class IndexJobData
-    {
-        public string Filename { get; set; }
-        public IAsset InputAsset { get; set; }
-        public IContentKey ContentKey { get; set; }
-        public byte[] ContentKeyData { get; set; }
-    }
-
     class UploadManager : IManager<string>
     {
         private readonly MediaServicesCredentials _credentials;
@@ -117,13 +109,13 @@ namespace MLSandboxPOC
                 lock (_assetsLock)
                 {
                     data.InputAsset = context.Assets.CreateFromFile(filePath, options);
+                    data.InputFileUploaded = DateTime.Now;
                     _logger.Information("Created and uploaded asset {asset} from {file}", data.InputAsset.ToLog(), filePath);
                 }
 
-                //MediaServicesUtils.RemoveEncryptionKey(context, data);
-                RemoveEncryptionKey(data);
+                MediaServicesUtils.RemoveEncryptionKey(data);
                 // var ck = context.ContentKeys.Where(k => k.ContentKeyType == ContentKeyType.StorageEncryption && k.Id==data.ContentKey.Id).ToArray();
-                MediaServicesUtils.RestoreEncryptionKey(context, data);
+               // MediaServicesUtils.RestoreEncryptionKey(context, data);
 
                 _fileProcessedNotifier.NotifyFileProcessed(filePath);
             }
@@ -140,19 +132,6 @@ namespace MLSandboxPOC
 
             //var test = asset.ContentKeys;
             return data;
-        }
-        private void RemoveEncryptionKey(IndexJobData data)
-        {
-            //lock (_contentKeyLock)
-            //{
-            data.ContentKey = data.InputAsset.ContentKeys.AsEnumerable()
-                .FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
-            data.ContentKeyData = data.ContentKey.GetClearKeyValue();
-            data.InputAsset.ContentKeys.Remove(data.ContentKey);
-            data.InputAsset.Update();
-            //}
-
-            _logger.Verbose("Removed encryption key {key} from asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
         }
 
         public Task WaitForAllTasks()

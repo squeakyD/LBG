@@ -14,82 +14,59 @@ namespace MLSandboxPOC
 
         private static readonly ILogger _logger = Logger.GetLog<MediaServicesUtils>();
 
-        //private static readonly object _contentKeyLock = new object();
-
         public static void RemoveEncryptionKey(IndexJobData data)
         {
-            //lock (_contentKeyLock)
-            //{
-            data.ContentKey = data.InputAsset.ContentKeys.AsEnumerable()
-                .FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+            data.ContentKey = data.InputAsset.ContentKeys.Single(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
             data.ContentKeyData = data.ContentKey.GetClearKeyValue();
             data.InputAsset.ContentKeys.Remove(data.ContentKey);
             data.InputAsset.Update();
-            //}
 
             _logger.Verbose("Removed encryption key {key} from asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
         }
 
-        public static void RemoveEncryptionKey(CloudMediaContext context, IndexJobData data)
-        {
-            //lock (_contentKeyLock)
-            //{
-            int c1 = context.ContentKeys.AsEnumerable().Count(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+        //public static void RemoveEncryptionKey(CloudMediaContext context, IndexJobData data)
+        //{
+        //         data.ContentKey = data.InputAsset.ContentKeys.AsEnumerable()
+        //            .FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+        //        data.ContentKeyData = data.ContentKey.GetClearKeyValue();
+        //        data.InputAsset.ContentKeys.Remove(data.ContentKey);
+        //        data.InputAsset.Update();
 
-                 data.ContentKey = data.InputAsset.ContentKeys.AsEnumerable()
-                    .FirstOrDefault(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
-                data.ContentKeyData = data.ContentKey.GetClearKeyValue();
-                data.InputAsset.ContentKeys.Remove(data.ContentKey);
-                data.InputAsset.Update();
-            //context.ContentKeys
-            //var newKey = context.ContentKeys.Create(Guid.Parse(GuidFromId(data.ContentKey.Id)), data.ContentKeyData, data.ContentKey.Name, data.ContentKey.ContentKeyType);
-            //data.ContentKey= newKey;
-            //}
+        //    //var newKey = context.ContentKeys.Create(Guid.Parse(GuidFromId(data.ContentKey.Id)), data.ContentKeyData, data.ContentKey.Name, data.ContentKey.ContentKeyType);
+        //    //data.ContentKey= newKey;
+        //    //}
 
-            int c2 = context.ContentKeys.AsEnumerable().Count(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
-            var ck = context.ContentKeys.Where(k => k.Id == data.ContentKey.Id).ToArray();
+        //    //int c2 = context.ContentKeys.AsEnumerable().Count(k => k.ContentKeyType == ContentKeyType.StorageEncryption);
+        //    //var ck = context.ContentKeys.Where(k => k.Id == data.ContentKey.Id).ToArray();
 
-            //foreach (var key in context.ContentKeys.ToList().Where(k => KeysListIDs.Contains(k.Id)).ToList())
-            //{
-            //    //try
-            //    //{
-            //        key.Delete();
-            //    //}
-            //    //catch (Exception e)
-            //    //{
-
-            //    //    Error = true;
-            //    //}
-            //}
-
-            _logger.Verbose("Removed encryption key {key} from asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
-        }
+        //    _logger.Verbose("Removed encryption key {key} from asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
+        //}
 
 
         public static void RestoreEncryptionKey(CloudMediaContext context, IndexJobData data)
         {
             _logger.Verbose("Restoring key {key} to asset {asset}", data.ContentKey.Id, data.InputAsset.ToLog());
 
-            //lock (_contentKeyLock)
-            //{
-                var newKey = context.ContentKeys.Create(Guid.Parse(GuidFromId(data.ContentKey.Id)), data.ContentKeyData, data.ContentKey.Name,
-                    data.ContentKey.ContentKeyType);
-                data.InputAsset.ContentKeys.Add(newKey);
-            //}
+            var newKey = context.ContentKeys.Create(Guid.Parse(GuidFromId(data.ContentKey.Id)), data.ContentKeyData, data.ContentKey.Name,
+                data.ContentKey.ContentKeyType);
+
+            // Cannot add content key directly to data.InputAsset as object.ReferenceEquals(asset, data.InputAsset)==false (probably due to threading)
+            var asset = context.Assets.AsEnumerable().Single(a => a.Id == data.InputAsset.Id);
+            asset.ContentKeys.Add(newKey);
         }
 
-        public static void DeleteAsset(IAsset asset)
+        public static async void DeleteAsset(IAsset asset)
         {
             if (asset != null)
             {
                 foreach (IAssetFile file in asset.AssetFiles)
                 {
                     _logger.Verbose("Deleting asset file {file} in asset {asset}", file.ToLog(), asset.ToLog());
-                    file.Delete();
+                    await file.DeleteAsync();
                 }
 
                 _logger.Verbose("Deleting asset {asset}", asset.ToLog());
-                asset.Delete();
+                await asset.DeleteAsync();
             }
         }
 

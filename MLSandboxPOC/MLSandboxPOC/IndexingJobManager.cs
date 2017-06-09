@@ -26,7 +26,7 @@ namespace MLSandboxPOC
         private readonly MediaServicesCredentials _credentials;
         private readonly string _configuration;
         private readonly string _mediaProcessor;
-        private readonly IManager<IAsset> _downloadManager;
+        private readonly IManager<IndexJobData> _downloadManager;
 
         private readonly ConcurrentQueue<IndexJobData> _indexJobQueue = new ConcurrentQueue<IndexJobData>();
         private readonly List<Task> _currentTasks = new List<Task>();
@@ -42,7 +42,7 @@ namespace MLSandboxPOC
         public static IndexingJobManager CreateIndexingJobManager(MediaServicesCredentials creds,
             string configuration,
             //FileProcessNotifier fileProcessedNotifier,
-            IManager<IAsset> downloadManager,
+            IManager<IndexJobData> downloadManager,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
             Debug.Assert(_instance == null);
@@ -56,7 +56,7 @@ namespace MLSandboxPOC
         private IndexingJobManager(MediaServicesCredentials creds,
             string configuration,
             //FileProcessNotifier fileProcessedNotifier,
-            IManager<IAsset> downloadManager,
+            IManager<IndexJobData> downloadManager,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
             _credentials = creds;
@@ -177,7 +177,7 @@ namespace MLSandboxPOC
                     try
                     {
                         var outputAsset = job.Run();
-                        _downloadManager.QueueItem(outputAsset);
+                        _downloadManager.QueueItem(jobData);
                     }
                     catch (Exception ex)
                     {

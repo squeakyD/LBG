@@ -21,6 +21,7 @@ namespace MLSandboxPOC
         private readonly bool _useDefNumberOfConcurrentTransfers;
         private readonly int _parallelTransferThreadCount;
         private readonly bool _useDefParallelTransferThreadCount;
+        private readonly string _outputLogDir;
 
         private const int DefFileWatcherInterval = 10;
 
@@ -53,6 +54,8 @@ namespace MLSandboxPOC
                 .Equals("Default", StringComparison.OrdinalIgnoreCase);
             _useDefParallelTransferThreadCount = ConfigurationManager.AppSettings["ParallelTransferThreadCount"]
                 .Equals("Default", StringComparison.OrdinalIgnoreCase);
+
+            _outputLogDir = ConfigurationManager.AppSettings["OutputLogDirectory"];
         }
 
         private int GetVal(string name, int def = int.MinValue)
@@ -107,6 +110,7 @@ namespace MLSandboxPOC
         public string OutputDirectory => _outputDirectory;
         public string ProcessingDirectory => _processingDirectory;
         public string SourceFilePattern => _searchPattern;
+        public string OutputLogDirectory => _outputLogDir;
         public int FileWatcherInterval => _fileWatcherInterval;
         public int NumberOfConcurrentUploads => _numberOfConcurrentUploads;
         public int NumberOfConcurrentDownloads => _numberOfConcurrentDownloads;

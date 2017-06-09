@@ -118,7 +118,7 @@ namespace MLSandboxPOC
 
                     File.Move(filePath, dest);
 
-                    _logger.Debug("Processed {file}", Path.GetFileName(filePath));
+                    _logger.Verbose("Moved {file} to 'processed' directory", Path.GetFileName(filePath));
                 }
                 catch (Exception ex)
                 {
