@@ -68,6 +68,10 @@ namespace MLSandboxPOC
             task.OutputAssets.AddNew($"Indexing Output for {file}", AssetCreationOptions.StorageEncrypted);
 
             job.StateChanged += StateChanged;
+
+            _jobData.InputAssetKeyRestored = DateTime.Now;
+            MediaServicesUtils.RestoreEncryptionKey(_context, _jobData);
+
             job.Submit();
 
             // Check job execution and wait for job to finish.
@@ -100,7 +104,7 @@ namespace MLSandboxPOC
         {
             Console.WriteLine("Job state changed event:");
             Console.WriteLine("  Previous state: " + e.PreviousState);
-            _logger.Debug("  Current job state: " + e.CurrentState);
+            _logger.Verbose("  Current job state: " + e.CurrentState);
             IJob job = (IJob) sender;
             var asset = job.InputMediaAssets.FirstOrDefault();
 
@@ -118,13 +122,11 @@ namespace MLSandboxPOC
                     Console.WriteLine("Please wait...");
                     break;
                 case JobState.Scheduled:
-                    //_jobData.InputAssetKeyRestored = DateTime.Now;
-                    //MediaServicesUtils.RestoreEncryptionKey(_context, _jobData);
                     Console.WriteLine("Please wait...");
                     break;
                 case JobState.Processing:
-                    _jobData.InputAssetKeyRestored = DateTime.Now;
-                    MediaServicesUtils.RestoreEncryptionKey(_context, _jobData);
+                    //_jobData.InputAssetKeyRestored = DateTime.Now;
+                    //MediaServicesUtils.RestoreEncryptionKey(_context, _jobData);
                     _jobData.OutputAssetCreated = DateTime.Now;
                     Console.WriteLine("Please wait...");
                     //if (_deleteFiles)

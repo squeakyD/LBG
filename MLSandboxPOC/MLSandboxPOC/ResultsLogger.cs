@@ -8,9 +8,9 @@ namespace MLSandboxPOC
         private readonly ILogger _logger;
         //private const string Separator = "|";
 
-        private static ResultsLogger _instance = new ResultsLogger();
+        private static ResultsLogger _instance;
 
-        public static ResultsLogger Instance => _instance;
+        public static ResultsLogger Instance => _instance ?? (_instance = new ResultsLogger());
 
         private ResultsLogger()
         {
@@ -18,7 +18,7 @@ namespace MLSandboxPOC
                 .WriteTo.RollingFile(Config.Instance.OutputLogDirectory + @"\MLSandboxPOC-JobResults-{Date}.txt")
                 .CreateLogger();
 
-            _logger.Verbose("|File|Total duration (s)|input Asset vulnerable (s)|output Asset vulnerable (s)");
+            _logger.Information("|File|Total duration (s)|input Asset vulnerable (s)|output Asset vulnerable (s)");
         }
 
         public void WriteResults(IndexJobData jobData)
@@ -33,8 +33,7 @@ namespace MLSandboxPOC
 
             // Excel friendly logging output
             _logger.Information(
-                "|{Filename}|{dur}|{t1}|{t2}"
-                , jobData.Filename, dur.TotalSeconds, t1.TotalSeconds, t2.TotalSeconds);
-        }       
+                $"|{jobData.Filename}|{dur.TotalSeconds}|{t1.TotalSeconds}|{t2.TotalSeconds}");
+        }
     }
 }

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.WindowsAzure.MediaServices.Client;
 using Serilog;
 using System.Diagnostics;
+using System.Linq;
 
 namespace MLSandboxPOC
 {
@@ -106,7 +107,7 @@ namespace MLSandboxPOC
                     //numItems = _assets.Count;
                 }
 
-                _logger.Debug("Waiting for remaining download tasks");
+                _logger.Verbose("Waiting for remaining download tasks");
                 Task.WaitAll(_currentTasks.ToArray());
 
                 _tokenSource.Cancel();
@@ -161,8 +162,11 @@ namespace MLSandboxPOC
                 //// TODO: try/catch here - https://msdn.microsoft.com/en-us/library/dd537614(v=vs.110).aspx
                 //Task.WaitAll(tasks.ToArray());
 
-                _logger.Debug("Deleting output asset {asset}", data.OutputAsset.ToLog());
+                _logger.Verbose("Deleting output asset {asset}", data.OutputAsset.ToLog());
                 await data.OutputAsset.DeleteAsync();
+
+                int numAssets = _context.Assets?.Count() ?? 0;
+                _logger.Verbose("Total number of assets now in Azure: {numAssets}", numAssets);
 
                 data.OutputAssetDeleted = DateTime.Now;
 
