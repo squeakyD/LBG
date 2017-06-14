@@ -29,7 +29,7 @@ namespace MLSandboxPOC
         private readonly IManager<IndexJobData> _downloadManager;
 
         private readonly ConcurrentQueue<IndexJobData> _indexJobQueue = new ConcurrentQueue<IndexJobData>();
-        private readonly List<Task> _currentTasks = new List<Task>();
+        private readonly List<IndexingJob> _currentJobs = new List<IndexingJob>();
         private readonly Task _processTask;
         private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
         private AutoResetEvent _itemsInQueueEvent = new AutoResetEvent(false);
@@ -95,14 +95,29 @@ namespace MLSandboxPOC
                 {
                     //_itemsInQueueEvent.WaitOne();
 
-                    _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
-
-                    while (_currentTasks.Count < NumMediaReservedUnits && _indexJobQueue.Count > 0)
+                    while (_currentJobs.Count < NumMediaReservedUnits && _indexJobQueue.Count > 0)
                     {
                         IndexJobData jobData;
                         if (_indexJobQueue.TryDequeue(out jobData))
                         {
-                            _currentTasks.Add(RunJob(jobData));
+                            _currentJobs.Add(CreateJob(jobData));
+                        }
+                    }
+
+                    if (_currentJobs.Count > 0)
+                    {
+                        var allTasks = _currentJobs.Select(j => j.JobTask).ToArray();
+                        int idx = Task.WaitAny(allTasks, 100);
+
+                        if (idx != -1)
+                        {
+                            var finishedJob = _currentJobs[idx];
+
+                            finishedJob.HandleJobResult();
+
+                            _downloadManager.QueueItem(finishedJob.JobData);
+
+                            _currentJobs.Remove(finishedJob);
                         }
                     }
 
@@ -112,7 +127,6 @@ namespace MLSandboxPOC
 
             return task;
         }
-
         public void QueueItem(IndexJobData data)
         {
             _logger.Debug("Queueing job for {file}", data.Filename);
@@ -143,7 +157,9 @@ namespace MLSandboxPOC
                 }
 
                 _logger.Debug("Waiting for remaining indexing tasks");
-                Task.WaitAll(_currentTasks.ToArray());
+
+                var allTasks = _currentJobs.Select(j => j.JobTask).ToArray();
+                Task.WaitAll(allTasks);
 
                 _tokenSource.Cancel();
 
@@ -169,27 +185,29 @@ namespace MLSandboxPOC
             });
         }
 
-        private Task RunJob(IndexJobData jobData)
+        private IndexingJob CreateJob(IndexJobData jobData)
         {
-            return Task.Run(() =>
+            var job = new IndexingJob(_credentials, jobData, _configuration, _mediaProcessor);
+            try
+            {
+                job.CreateJob();
+            }
+            catch (Exception ex)
+            {
+                job.DeleteAsset();
+
+                if (!(ex is AggregateException))
                 {
-                    var job = new IndexingJob(_credentials, jobData, _configuration, _mediaProcessor);
-                    try
-                    {
-                        var outputAsset = job.Run();
-                        _downloadManager.QueueItem(jobData);
-                    }
-                    catch (Exception ex)
-                    {
-                        // In the event of an error, abort this job, but catch the exception so that other jobs can complete
-                        _logger.Error(ex, "Error indexing {file}", jobData.Filename);
-                    }
-                    finally
-                    {
-                        job.DeleteAsset();
-                    }
+                    // In the event of an error, abort this job, but catch the exception so that other jobs can complete
+                    _logger.Error(ex, "Error indexing {file}", jobData.Filename);
                 }
-            );
+                else
+                {
+                    throw;
+                }
+            }
+
+            return job;
         }
     }
 }
