@@ -11,11 +11,11 @@ namespace MLSandboxPOC
         public IContentKey ContentKey { get; set; }
         public byte[] ContentKeyData { get; set; }
         public IAsset OutputAsset { get; set; }
+        public DateTime InputAssetUploadStart { get; set; }
         public DateTime InputFileUploaded { get; set; }
         public DateTime InputAssetKeyRestored { get; set; }
         public DateTime InputAssetDeleted { get; set; }
         public DateTime OutputAssetCreated { get; set; }
         public DateTime OutputAssetDeleted { get; set; }
-
     }
 }

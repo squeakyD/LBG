@@ -108,14 +108,13 @@ namespace MLSandboxPOC
             {
                 lock (_assetsLock)
                 {
+                    data.InputAssetUploadStart = DateTime.Now;
                     data.InputAsset = context.Assets.CreateFromFile(filePath, options);
                     data.InputFileUploaded = DateTime.Now;
                     _logger.Information("Created and uploaded asset {asset} from {file}", data.InputAsset.ToLog(), filePath);
                 }
 
                 MediaServicesUtils.RemoveEncryptionKey(data);
-                // var ck = context.ContentKeys.Where(k => k.ContentKeyType == ContentKeyType.StorageEncryption && k.Id==data.ContentKey.Id).ToArray();
-               // MediaServicesUtils.RestoreEncryptionKey(context, data);
 
                 _fileProcessedNotifier.NotifyFileProcessed(filePath);
             }
