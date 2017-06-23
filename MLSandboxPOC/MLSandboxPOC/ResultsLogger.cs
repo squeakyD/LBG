@@ -18,20 +18,19 @@ namespace MLSandboxPOC
                 .WriteTo.RollingFile(Config.Instance.OutputLogDirectory + @"\MLSandboxPOC-JobResults-{Date}.txt")
                 .CreateLogger();
 
-            //_logger.Information("|File|Total duration (s)|input Asset vulnerable (s)|output Asset vulnerable (s)");
-            _logger.Information("|File|Total duration (s)|Create asset and upload file (s)|Input Asset vulnerable (s)|Output Asset vulnerable (s)");
+            _logger.Information("|File|File Size|Total duration (s)|Create asset and upload file (s)|Input Asset vulnerable (s)|Output Asset vulnerable (s)");
         }
 
         public void WriteResults(IndexJobData jobData)
         {
-            TimeSpan dur = jobData.OutputAssetDeleted - jobData.InputAssetUploadStart;// jobData.InputFileUploaded;
+            TimeSpan dur = jobData.OutputAssetDeleted - jobData.InputAssetUploadStart;
             TimeSpan t1 = jobData.InputFileUploaded - jobData.InputAssetUploadStart;
             TimeSpan t2 = jobData.InputAssetDeleted - jobData.InputAssetKeyRestored;
             TimeSpan t3 = jobData.OutputAssetDeleted - jobData.OutputAssetCreated;
 
             // Excel friendly logging output
             _logger.Information(
-                $"|{jobData.Filename}|{dur.TotalSeconds}|{t1.TotalSeconds}|{t2.TotalSeconds}|{t3.TotalSeconds}");
+                $"|{jobData.Filename}|{jobData.FileSize}|{dur.TotalSeconds}|{t1.TotalSeconds}|{t2.TotalSeconds}|{t3.TotalSeconds}");
         }
     }
 }

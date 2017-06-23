@@ -7,6 +7,7 @@ namespace MLSandboxPOC
     class IndexJobData
     {
         public string Filename { get; set; }
+        public long FileSize { get; set; }
         public IAsset InputAsset { get; set; }
         public IContentKey ContentKey { get; set; }
         public byte[] ContentKeyData { get; set; }

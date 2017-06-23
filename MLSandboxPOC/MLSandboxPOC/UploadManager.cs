@@ -11,7 +11,7 @@ using Serilog;
 
 namespace MLSandboxPOC
 {
-    class UploadManager : IManager<string>
+    class UploadManager : IManager<IndexJobData>
     {
         private readonly MediaServicesCredentials _credentials;
         private readonly FileProcessNotifier _fileProcessedNotifier;
@@ -19,7 +19,7 @@ namespace MLSandboxPOC
         private readonly int _numberOfConcurrentTasks;
         private readonly ILogger _logger = Logger.GetLog<UploadManager>();
 
-        private readonly ConcurrentQueue<string> _fileNames = new ConcurrentQueue<string>();
+        private readonly ConcurrentQueue<IndexJobData> _jobDataQueue = new ConcurrentQueue<IndexJobData>();
         private readonly List<Task> _currentTasks = new List<Task>();
         private readonly Task _processTask;
         private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
@@ -65,12 +65,12 @@ namespace MLSandboxPOC
 
                     _currentTasks.RemoveAll(t => t.IsCompleted || t.IsFaulted || t.IsCanceled);
 
-                    while (_currentTasks.Count < _numberOfConcurrentTasks && _fileNames.Count > 0)
+                    while (_currentTasks.Count < _numberOfConcurrentTasks && _jobDataQueue.Count > 0)
                     {
-                        string inputFile;
-                        if (_fileNames.TryDequeue(out inputFile))
+                        IndexJobData jobData;
+                        if (_jobDataQueue.TryDequeue(out jobData))
                         {
-                            _currentTasks.Add(UploadFile(inputFile));
+                            _currentTasks.Add(UploadFile(jobData));
                         }
                     }
 
@@ -81,42 +81,39 @@ namespace MLSandboxPOC
             return task;
         }
 
-        private Task UploadFile(string fileName)
+        private Task UploadFile(IndexJobData jobData)
         {
             return Task.Run(() =>
             {
                 try
                 {
                     var context = new CloudMediaContext(_credentials);
-                    var data = CreateAssetAndUploadSingleFile(context, fileName, AssetCreationOptions.StorageEncrypted);
+                    var data = CreateAssetAndUploadSingleFile(context, jobData, AssetCreationOptions.StorageEncrypted);
                     _indexingManager.QueueItem(data);
                 }
                 catch (Exception ex)
                 {
                     // In the event of an error, abort this job, but catch the exception so that other jobs can complete
-                    _logger.Error(ex, "Error uploading/indexing {file}", fileName);
+                    _logger.Error(ex, "Error uploading/indexing {file}", jobData.Filename);
                 }
             });
         }
 
-        private IndexJobData CreateAssetAndUploadSingleFile(CloudMediaContext context, string filePath, AssetCreationOptions options)
+        private IndexJobData CreateAssetAndUploadSingleFile(CloudMediaContext context, IndexJobData data, AssetCreationOptions options)
         {
-            //IAsset asset;
-            var data = new IndexJobData {Filename = filePath};
-
             try
             {
                 lock (_assetsLock)
                 {
                     data.InputAssetUploadStart = DateTime.Now;
-                    data.InputAsset = context.Assets.CreateFromFile(filePath, options);
+                    data.InputAsset = context.Assets.CreateFromFile(data.Filename, options);
                     data.InputFileUploaded = DateTime.Now;
-                    _logger.Information("Created and uploaded asset {asset} from {file}", data.InputAsset.ToLog(), filePath);
+                    _logger.Information("Created and uploaded asset {asset} from {file}", data.InputAsset.ToLog(), data.Filename);
                 }
 
                 MediaServicesUtils.RemoveEncryptionKey(data);
 
-                _fileProcessedNotifier.NotifyFileProcessed(filePath);
+                _fileProcessedNotifier.NotifyFileProcessed(data.Filename);
             }
             catch
             {
@@ -126,10 +123,7 @@ namespace MLSandboxPOC
                 }
                 throw;
             }
-            // TEST
-            //RestoreEncryptionKey(asset);
 
-            //var test = asset.ContentKeys;
             return data;
         }
 
@@ -140,7 +134,7 @@ namespace MLSandboxPOC
                 _logger.Information("Waiting for all outstanding uploads to complete");
                 int numItems = 0;
 
-                numItems = _fileNames.Count;
+                numItems = _jobDataQueue.Count;
 
                 int oldNumItems = numItems + 1;
                 while (numItems > 0)
@@ -152,7 +146,7 @@ namespace MLSandboxPOC
                     }
                     Thread.Sleep(1000);
 
-                    numItems = _fileNames.Count;
+                    numItems = _jobDataQueue.Count;
                 }
 
                 _logger.Debug("Waiting for remaining indexing tasks");
@@ -182,10 +176,10 @@ namespace MLSandboxPOC
             });
         }
 
-        void IManager<string>.QueueItem(string fileName)
+        void IManager<IndexJobData>.QueueItem(IndexJobData jobData)
         {
-            _logger.Debug("Queueing {file}", fileName);
-            _fileNames.Enqueue(fileName);
+            _logger.Debug("Queueing {file}", jobData.Filename);
+            _jobDataQueue.Enqueue(jobData);
             _itemsInQueueEvent.Set();
         }
 

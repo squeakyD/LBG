@@ -16,14 +16,14 @@ namespace MLSandboxPOC
     class FileSourceManager: IFileProcessedObserver
     {
         private readonly ILogger _logger;
-        private readonly IManager<string> _uploadManager;
+        private readonly IManager<IndexJobData> _uploadManager;
         private readonly Timer _timer;
 
         private static FileSourceManager _instance;
 
         private readonly static object _fileProcessorLock = new object();
 
-        public static FileSourceManager CreateFileSourceManager(IManager<string> uploadManager, FileProcessNotifier notifier)
+        public static FileSourceManager CreateFileSourceManager(IManager<IndexJobData> uploadManager, FileProcessNotifier notifier)
         {
             Debug.Assert(_instance == null);
             _instance = new FileSourceManager(uploadManager);
@@ -31,7 +31,7 @@ namespace MLSandboxPOC
             return _instance;
         }
 
-        private FileSourceManager(IManager<string> uploadManager)
+        private FileSourceManager(IManager<IndexJobData> uploadManager)
         {
             _uploadManager = uploadManager;
             _logger = Logger.GetLog<FileSourceManager>();
@@ -94,7 +94,14 @@ namespace MLSandboxPOC
                     }
 
                     File.Move(filePath, dest);
-                   _uploadManager.QueueItem(fileToProcess);
+
+                    var data = new IndexJobData
+                    {
+                        Filename = fileToProcess,
+                        FileSize = new FileInfo(fileToProcess).Length
+                    };
+
+                   _uploadManager.QueueItem(data);
                 }
                 catch (Exception ex)
                 {

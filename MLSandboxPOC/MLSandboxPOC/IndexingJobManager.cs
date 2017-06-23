@@ -41,7 +41,6 @@ namespace MLSandboxPOC
 
         public static IndexingJobManager CreateIndexingJobManager(MediaServicesCredentials creds,
             string configuration,
-            //FileProcessNotifier fileProcessedNotifier,
             IManager<IndexJobData> downloadManager,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
@@ -55,13 +54,11 @@ namespace MLSandboxPOC
 
         private IndexingJobManager(MediaServicesCredentials creds,
             string configuration,
-            //FileProcessNotifier fileProcessedNotifier,
             IManager<IndexJobData> downloadManager,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
             _credentials = creds;
             _configuration = configuration;
-            //_fileProcessedNotifier = fileProcessedNotifier;
             _downloadManager = downloadManager;
             _mediaProcessor = mediaProcessor;
             _logger = Logger.GetLog<IndexingJobManager>();
