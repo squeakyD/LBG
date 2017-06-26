@@ -14,6 +14,7 @@ namespace MLSandboxPOC
         private static MediaServicesCredentials _cachedCredentials = null;
 
         private static ILogger _logger;
+
         //private static MSRestClient _restClient;
 
         static void Main(string[] args)
@@ -98,10 +99,13 @@ namespace MLSandboxPOC
 
         private static void InitialiseMediaServicesClient()
         {
-            CreateCredentials();
+            //CreateCredentials();
 
-            // Used the cached credentials to create CloudMediaContext.
-            _context = new CloudMediaContext(_cachedCredentials);
+            //// Used the cached credentials to create CloudMediaContext.
+            //_context = new CloudMediaContext(_cachedCredentials);
+
+
+            UseAzureADAuthentication();
 
             if (!Config.Instance.UseDefaultNumberOfConcurrentTransfers)
             {
@@ -124,6 +128,20 @@ namespace MLSandboxPOC
             _logger.Information(
                 "NumberOfConcurrentTransfers: {NumberOfConcurrentTransfers}, ParallelTransferThreadCount: {ParallelTransferThreadCount}",
                 _context.NumberOfConcurrentTransfers, _context.ParallelTransferThreadCount);
+        }
+
+        private static void UseAzureADAuthentication()
+        {
+            // Login as service principal
+
+            //var tokenCredentials = new AzureAdTokenCredentials(“{ YOUR AAD TENANT DOMAIN HERE }”, new AzureAdClientSymmetricKey(“{ YOUR CLIENT ID HERE }”, “{ YOUR CLIENT SECRET}”), AzureEnvironments.AzureCloudEnvironment);
+
+            // Key= A0I38Y9aqB3t1j1ThJcajq3DjgE9LfOknvSjqveJqvs=
+            var tokenCredentials = new AzureAdTokenCredentials("Lloydsbanking.com", new AzureAdClientSymmetricKey("1f849e4f-793d-4ef0-8ee1-6480472d73ef", "A0I38Y9aqB3t1j1ThJcajq3DjgE9LfOknvSjqveJqvs="), AzureEnvironments.AzureCloudEnvironment);
+            var tokenProvider = new AzureAdTokenProvider(tokenCredentials);
+
+            Uri mediaServicesApiServerUri = new Uri("https://machinelearningdev01.restv2.northeurope.media.azure.net/api/");
+            _context = new CloudMediaContext(mediaServicesApiServerUri, tokenProvider);
         }
 
         //private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
