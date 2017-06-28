@@ -13,7 +13,6 @@ namespace MLSandboxPOC
 {
     class UploadManager : IManager<IndexJobData>
     {
-        private readonly MediaServicesCredentials _credentials;
         private readonly FileProcessNotifier _fileProcessedNotifier;
         private readonly IManager<IndexJobData> _indexingManager;
         private readonly int _numberOfConcurrentTasks;
@@ -28,22 +27,21 @@ namespace MLSandboxPOC
 
         private static UploadManager _instance;
 
-        public static UploadManager CreateUploadManager(MediaServicesCredentials creds, FileProcessNotifier fileProcessedNotifier,
+        public static UploadManager CreateUploadManager(FileProcessNotifier fileProcessedNotifier,
             IManager<IndexJobData> indexingManager,
             int numberOfConcurrentTasks)
         {
             Debug.Assert(_instance == null);
             if (_instance == null)
             {
-                _instance = new UploadManager(creds, fileProcessedNotifier, indexingManager, numberOfConcurrentTasks);
+                _instance = new UploadManager(fileProcessedNotifier, indexingManager, numberOfConcurrentTasks);
             }
             return _instance;
         }
 
-        private UploadManager(MediaServicesCredentials creds, FileProcessNotifier fileProcessedNotifier, IManager<IndexJobData> indexingManager,
+        private UploadManager(FileProcessNotifier fileProcessedNotifier, IManager<IndexJobData> indexingManager,
             int numberOfConcurrentTasks)
         {
-            _credentials = creds;
             _fileProcessedNotifier = fileProcessedNotifier;
             _indexingManager = indexingManager;
             _numberOfConcurrentTasks = numberOfConcurrentTasks;
@@ -87,7 +85,7 @@ namespace MLSandboxPOC
             {
                 try
                 {
-                    var context = new CloudMediaContext(_credentials);
+                    var context = CloudMediaContextFactory.Instance.CloudMediaContext;
                     var data = CreateAssetAndUploadSingleFile(context, jobData, AssetCreationOptions.StorageEncrypted);
                     _indexingManager.QueueItem(data);
                 }

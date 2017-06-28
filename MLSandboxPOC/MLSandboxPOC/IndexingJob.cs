@@ -14,15 +14,11 @@ namespace MLSandboxPOC
         private readonly CloudMediaContext _context;
         private IJob _job;
 
-        //private readonly FileProcessNotifier _fileProcessedNotifier;
-
         private readonly string _configuration;
         private readonly string _mediaProcessor;
         private readonly bool _deleteFiles;
 
-        public IndexingJob(MediaServicesCredentials creds,
-            //FileProcessNotifier fileProcessedNotifier, 
-            IndexJobData jobData, string configuration,
+        public IndexingJob(IndexJobData jobData, string configuration,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview, bool deleteFiles = true)
         {
             //_fileProcessedNotifier = fileProcessedNotifier;
@@ -31,7 +27,7 @@ namespace MLSandboxPOC
             _mediaProcessor = mediaProcessor;
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<IndexingJob>();
-            _context = new CloudMediaContext(creds);
+            _context = CloudMediaContextFactory.Instance.CloudMediaContext;
         }
 
         public Task JobTask { get; private set; }

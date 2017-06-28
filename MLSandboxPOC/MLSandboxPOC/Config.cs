@@ -6,8 +6,10 @@ namespace MLSandboxPOC
 {
     class Config
     {
-        //private readonly string _mediaServicesAccountName = ConfigurationManager.AppSettings["MediaServicesAccountName"];
-        //private readonly string _mediaServicesAccountKey = ConfigurationManager.AppSettings["MediaServicesAccountKey"];
+        private readonly string _mediaServicesAppId = ConfigurationManager.AppSettings["ms1"];
+        private readonly string _mediaServicesAppKey = ConfigurationManager.AppSettings["ms2"];
+        private readonly string _mediaServicesAppTenant = ConfigurationManager.AppSettings["ms3"];
+        private readonly string _azMediaServicesApiUrl = ConfigurationManager.AppSettings["AzMediaServicesApiUrl"];
         private readonly string _sourceDirectory = ConfigurationManager.AppSettings["SourceDirectory"];
 
         private readonly string _processedDirectory = ConfigurationManager.AppSettings["ProcessedDirectory"];
@@ -118,5 +120,10 @@ namespace MLSandboxPOC
         public bool UseDefaultNumberOfConcurrentTransfers => _useDefNumberOfConcurrentTransfers;
         public int ParallelTransferThreadCount => _parallelTransferThreadCount;
         public bool UseDefaultParallelTransferThreadCount => _useDefParallelTransferThreadCount;
+
+        public string MediaServicesAppId => _mediaServicesAppId;
+        public string MediaServicesAppKey => _mediaServicesAppKey;
+        public string MediaServicesAppTenant => _mediaServicesAppTenant;
+        public string AzMediaServicesApiUrl => _azMediaServicesApiUrl;
     }
 }

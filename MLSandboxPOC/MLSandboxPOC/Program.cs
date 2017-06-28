@@ -11,7 +11,6 @@ namespace MLSandboxPOC
     {
         // Field for service context.
         private static CloudMediaContext _context = null;
-        private static MediaServicesCredentials _cachedCredentials = null;
 
         private static ILogger _logger;
 
@@ -64,9 +63,9 @@ namespace MLSandboxPOC
                 var fileProcessNotifier = FileProcessNotifier.Instance;
 
                 string configuration = File.ReadAllText("config.json");
-                var indexingJobManager = IndexingJobManager.CreateIndexingJobManager(_cachedCredentials, configuration, downloadManager);
+                var indexingJobManager = IndexingJobManager.CreateIndexingJobManager(configuration, downloadManager);
 
-                var uploadManager = UploadManager.CreateUploadManager(_cachedCredentials, fileProcessNotifier, indexingJobManager, Config.Instance.NumberOfConcurrentUploads);
+                var uploadManager = UploadManager.CreateUploadManager(fileProcessNotifier, indexingJobManager, Config.Instance.NumberOfConcurrentUploads);
 
                 var fileMgr = FileSourceManager.CreateFileSourceManager(uploadManager, fileProcessNotifier);
 
@@ -104,8 +103,7 @@ namespace MLSandboxPOC
             //// Used the cached credentials to create CloudMediaContext.
             //_context = new CloudMediaContext(_cachedCredentials);
 
-
-            UseAzureADAuthentication();
+            _context = CloudMediaContextFactory.Instance.CloudMediaContext;
 
             if (!Config.Instance.UseDefaultNumberOfConcurrentTransfers)
             {
@@ -130,19 +128,7 @@ namespace MLSandboxPOC
                 _context.NumberOfConcurrentTransfers, _context.ParallelTransferThreadCount);
         }
 
-        private static void UseAzureADAuthentication()
-        {
-            // Login as service principal
 
-            //var tokenCredentials = new AzureAdTokenCredentials(“{ YOUR AAD TENANT DOMAIN HERE }”, new AzureAdClientSymmetricKey(“{ YOUR CLIENT ID HERE }”, “{ YOUR CLIENT SECRET}”), AzureEnvironments.AzureCloudEnvironment);
-
-            // Key= A0I38Y9aqB3t1j1ThJcajq3DjgE9LfOknvSjqveJqvs=
-            var tokenCredentials = new AzureAdTokenCredentials("Lloydsbanking.com", new AzureAdClientSymmetricKey("1f849e4f-793d-4ef0-8ee1-6480472d73ef", "A0I38Y9aqB3t1j1ThJcajq3DjgE9LfOknvSjqveJqvs="), AzureEnvironments.AzureCloudEnvironment);
-            var tokenProvider = new AzureAdTokenProvider(tokenCredentials);
-
-            Uri mediaServicesApiServerUri = new Uri("https://machinelearningdev01.restv2.northeurope.media.azure.net/api/");
-            _context = new CloudMediaContext(mediaServicesApiServerUri, tokenProvider);
-        }
 
         //private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
         //{
@@ -150,7 +136,7 @@ namespace MLSandboxPOC
 
         private static void GetAllAssetFiles()
         {
-            CreateCredentials();
+            //CreateCredentials();
 
             _logger.Information("Downloading all stored audio file info");
 
@@ -174,22 +160,23 @@ namespace MLSandboxPOC
             }
         }
 
-        private static void CreateCredentials()
-        {
-            _logger.Debug("Logging in");
+        //[Obsolete("Use Azure AD authentication instead")]
+        //private static void CreateCredentials()
+        //{
+        //    _logger.Debug("Logging in");
 
-            string accountName;
-            string accountKey;
+        //    string accountName;
+        //    string accountKey;
 
-            string cfg = Path.Combine(ConfigurationManager.AppSettings["AzureCfg"], "azure.cfg");
-            using (var st = File.OpenText(cfg))
-            {
-                accountName = st.ReadLine();
-                accountKey = st.ReadLine();
-            }
+        //    string cfg = Path.Combine(ConfigurationManager.AppSettings["AzureCfg"], "azure.cfg");
+        //    using (var st = File.OpenText(cfg))
+        //    {
+        //        accountName = st.ReadLine();
+        //        accountKey = st.ReadLine();
+        //    }
 
-            _cachedCredentials = new MediaServicesCredentials(accountName, accountKey);
-        }
+        //    _cachedCredentials = new MediaServicesCredentials(accountName, accountKey);
+        //}
 
         private static IAsset CreateAssetFromFolder()
         {

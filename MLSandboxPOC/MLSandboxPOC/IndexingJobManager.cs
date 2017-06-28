@@ -23,7 +23,6 @@ namespace MLSandboxPOC
     class IndexingJobManager : IManager<IndexJobData>
     {
         private readonly ILogger _logger;
-        private readonly MediaServicesCredentials _credentials;
         private readonly string _configuration;
         private readonly string _mediaProcessor;
         private readonly IManager<IndexJobData> _downloadManager;
@@ -39,7 +38,7 @@ namespace MLSandboxPOC
 
         private static IndexingJobManager _instance;
 
-        public static IndexingJobManager CreateIndexingJobManager(MediaServicesCredentials creds,
+        public static IndexingJobManager CreateIndexingJobManager(
             string configuration,
             IManager<IndexJobData> downloadManager,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
@@ -47,17 +46,15 @@ namespace MLSandboxPOC
             Debug.Assert(_instance == null);
             if (_instance == null)
             {
-                _instance = new IndexingJobManager(creds, configuration, downloadManager, mediaProcessor);
+                _instance = new IndexingJobManager(configuration, downloadManager, mediaProcessor);
             }
             return _instance;
         }
 
-        private IndexingJobManager(MediaServicesCredentials creds,
-            string configuration,
+        private IndexingJobManager(string configuration,
             IManager<IndexJobData> downloadManager,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview)
         {
-            _credentials = creds;
             _configuration = configuration;
             _downloadManager = downloadManager;
             _mediaProcessor = mediaProcessor;
@@ -70,7 +67,7 @@ namespace MLSandboxPOC
 
         private void SetMediaReservedUnits()
         {
-            var context=new CloudMediaContext(_credentials);
+            var context= CloudMediaContextFactory.Instance.CloudMediaContext;
             IEncodingReservedUnit encodingS1ReservedUnit = context.EncodingReservedUnits.FirstOrDefault();
             encodingS1ReservedUnit.ReservedUnitType = ReservedUnitType.Basic; // Corresponds to S1
             encodingS1ReservedUnit.Update();
@@ -184,7 +181,7 @@ namespace MLSandboxPOC
 
         private IndexingJob CreateJob(IndexJobData jobData)
         {
-            var job = new IndexingJob(_credentials, jobData, _configuration, _mediaProcessor);
+            var job = new IndexingJob(jobData, _configuration, _mediaProcessor);
             try
             {
                 job.CreateJob();

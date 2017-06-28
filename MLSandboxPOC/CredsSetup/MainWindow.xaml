@@ -1,0 +1,34 @@
+﻿<Window x:Class="ProtectCreds.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ProtectCreds"
+        mc:Ignorable="d"
+        Title="Setup POC Credentials" Height="246.4" Width="480" ResizeMode="NoResize" Topmost="True" WindowStartupLocation="CenterScreen" >
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="0*"/>
+        </Grid.ColumnDefinitions>
+        
+        <TextBlock x:Name="textBlock" HorizontalAlignment="Left" Margin="10,10,0,0" TextWrapping="Wrap" Text="Please fill in the following details, which can be found under Azure Media Services -> API Access blade" VerticalAlignment="Top" FontStyle="Italic" TextDecorations="{x:Null}" Width="423"/>
+
+        <StackPanel x:Name="container" HorizontalAlignment="Left" Margin="10,60,0,0" VerticalAlignment="Top">
+            <StackPanel Orientation="Horizontal">
+                <StackPanel Orientation="Vertical">
+                    <Label x:Name="label" Content="Application Id " HorizontalAlignment="Left"  Height="23" />
+                    <Label x:Name="label2" Content="Application Key" HorizontalAlignment="Left" Height="25" Margin="0,2"/>
+                    <Label x:Name="label3" Content="Azure Active Directory tenant domain" HorizontalAlignment="Left" Height="25" Margin="0,2"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="5,0">
+                    <TextBox x:Name="_appId" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Width="232"/>
+                    <TextBox x:Name="_key" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Margin="0,4" Width="232"/>
+                    <TextBox x:Name="_tenant" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Margin="0,4" Width="232"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+        <Button x:Name="_btnSetConfig" Content="Set Config"  VerticalAlignment="Top" Click="setConfig_Click" Margin="130,171,154.2,0" Height="19"/>
+
+    </Grid>
+</Window>
