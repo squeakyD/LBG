@@ -21,7 +21,6 @@ namespace MLSandboxPOC
         public IndexingJob(IndexJobData jobData, string configuration,
             string mediaProcessor = MediaProcessorNames.AzureMediaIndexer2Preview, bool deleteFiles = true)
         {
-            //_fileProcessedNotifier = fileProcessedNotifier;
             JobData = jobData;
             _configuration = configuration;
             _mediaProcessor = mediaProcessor;

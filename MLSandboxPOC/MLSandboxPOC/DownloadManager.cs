@@ -26,22 +26,19 @@ namespace MLSandboxPOC
 
         private static DownloadManager _instance;
 
-        public static DownloadManager CreateDownloadManager(CloudMediaContext context,
-            int numberOfConcurrentDownloads)
+        public static DownloadManager CreateDownloadManager(int numberOfConcurrentDownloads)
         {
             Debug.Assert(_instance == null);
             if (_instance == null)
             {
-                _instance = new DownloadManager(context, numberOfConcurrentDownloads);
+                _instance = new DownloadManager(numberOfConcurrentDownloads);
             }
             return _instance;
         }
 
-        private DownloadManager(CloudMediaContext context,
-            int numberOfConcurrentDownloads,
-            bool deleteFiles = true)
+        private DownloadManager(int numberOfConcurrentDownloads, bool deleteFiles = true)
         {
-            _context = context;
+            _context = CloudMediaContextFactory.Instance.CloudMediaContext;
             _numberOfConcurrentTasks = numberOfConcurrentDownloads;
             _deleteFiles = deleteFiles;
             _logger = Logger.GetLog<DownloadManager>();
@@ -152,7 +149,7 @@ namespace MLSandboxPOC
                     //await file.DownloadAsync(Path.Combine(Config.Instance.OutputDirectory, file.Name), _blobClient, asset.Locators[0], CancellationToken.None);
                     file.Download(Path.Combine(Config.Instance.OutputDirectory, file.Name));
 
-                    _logger.Debug("Deleting output file {file} in asset {asset}", file.ToLog(), data.OutputAsset.ToLog());
+                    _logger.Verbose("Deleting output file {file} in asset {asset}", file.ToLog(), data.OutputAsset.ToLog());
                     await file.DeleteAsync();
                     //});
                     //

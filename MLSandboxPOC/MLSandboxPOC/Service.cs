@@ -19,12 +19,12 @@ namespace MLSandboxPOC
 
         protected override void OnStart(string[] args)
         {
-            // TODO: Add code here to start your service.
+            ProcessRunner.Instance.Run();
         }
 
         protected override void OnStop()
         {
-            // TODO: Add code here to perform any tear-down necessary to stop your service.
+            ProcessRunner.Instance.Shutdown();
         }
     }
 }

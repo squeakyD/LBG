@@ -28,7 +28,7 @@ namespace MLSandboxPOC
                 Console.WriteLine("==============");
                 Console.WriteLine();
 
-                InitialiseMediaServicesClient();
+                //InitialiseMediaServicesClient();
 
                 //string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009249280 040417_1.wav");
@@ -40,47 +40,32 @@ namespace MLSandboxPOC
 
                 if (args.Length > 0)
                 {
+                    _context = CloudMediaContextFactory.Instance.CloudMediaContext;
+
                     if (args[0].Equals("delOnly", StringComparison.InvariantCultureIgnoreCase))
                     {
                         DeleteAssetFiles();
-                        return;
                     }
                     else if (args[0].Equals("getAssets", StringComparison.InvariantCultureIgnoreCase))
                     {
                         GetAllAssetFiles();
-                        return;
                     }
                     //else if (args[0].Equals("-f", StringComparison.InvariantCultureIgnoreCase))
                     //{
                     //    src = Path.Combine(_sourceDir, args[1]);
                     //}
+
+                    return;
                 }
 
-                //_restClient = new MSRestClient(_cachedCredentials);
-
-                var downloadManager = DownloadManager.CreateDownloadManager(_context, Config.Instance.NumberOfConcurrentDownloads);
-
-                var fileProcessNotifier = FileProcessNotifier.Instance;
-
-                string configuration = File.ReadAllText("config.json");
-                var indexingJobManager = IndexingJobManager.CreateIndexingJobManager(configuration, downloadManager);
-
-                var uploadManager = UploadManager.CreateUploadManager(fileProcessNotifier, indexingJobManager, Config.Instance.NumberOfConcurrentUploads);
-
-                var fileMgr = FileSourceManager.CreateFileSourceManager(uploadManager, fileProcessNotifier);
+                ProcessRunner.Instance.Run();
 
                 Console.WriteLine("Started filewatcher");
                 Console.WriteLine("-> Press any key to exit");
 
                 Console.ReadKey();
 
-                fileMgr.ShutdownTimer();
-                var t1 = uploadManager.WaitForAllTasks();
-                t1.Wait();
-                var t2 = indexingJobManager.WaitForAllTasks();
-                t2.Wait();
-                var t3 = downloadManager.WaitForAllTasks();
-                t3.Wait();
+                ProcessRunner.Instance.Shutdown();
 
                 // Run indexing job.
                 //uploadManager.QueueItem(src);
@@ -95,44 +80,6 @@ namespace MLSandboxPOC
                 _logger.Error(ex, "Fatal error in demo program!!!");
             }
         }
-
-        private static void InitialiseMediaServicesClient()
-        {
-            //CreateCredentials();
-
-            //// Used the cached credentials to create CloudMediaContext.
-            //_context = new CloudMediaContext(_cachedCredentials);
-
-            _context = CloudMediaContextFactory.Instance.CloudMediaContext;
-
-            if (!Config.Instance.UseDefaultNumberOfConcurrentTransfers)
-            {
-                _context.NumberOfConcurrentTransfers = Config.Instance.NumberOfConcurrentTransfers;
-            }
-            else
-            {
-                _logger.Information("Using default SDK value for NumberOfConcurrentTransfers");
-            }
-
-            if (!Config.Instance.UseDefaultParallelTransferThreadCount)
-            {
-                _context.ParallelTransferThreadCount = Config.Instance.ParallelTransferThreadCount;
-            }
-            else
-            {
-                _logger.Information("Using default SDK value for ParallelTransferThreadCount");
-            }
-
-            _logger.Information(
-                "NumberOfConcurrentTransfers: {NumberOfConcurrentTransfers}, ParallelTransferThreadCount: {ParallelTransferThreadCount}",
-                _context.NumberOfConcurrentTransfers, _context.ParallelTransferThreadCount);
-        }
-
-
-
-        //private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
-        //{
-        //}
 
         private static void GetAllAssetFiles()
         {
@@ -159,24 +106,6 @@ namespace MLSandboxPOC
                 }
             }
         }
-
-        //[Obsolete("Use Azure AD authentication instead")]
-        //private static void CreateCredentials()
-        //{
-        //    _logger.Debug("Logging in");
-
-        //    string accountName;
-        //    string accountKey;
-
-        //    string cfg = Path.Combine(ConfigurationManager.AppSettings["AzureCfg"], "azure.cfg");
-        //    using (var st = File.OpenText(cfg))
-        //    {
-        //        accountName = st.ReadLine();
-        //        accountKey = st.ReadLine();
-        //    }
-
-        //    _cachedCredentials = new MediaServicesCredentials(accountName, accountKey);
-        //}
 
         private static IAsset CreateAssetFromFolder()
         {

@@ -288,3 +288,4 @@ __pycache__/
 *.xsd.cs
 /MediaSvcsIndexer2Demo/MediaSvcsIndexer2Demo/azure.cfg
 /MLSandboxPOC/MLSandboxPOC/azure.cfg
+/MLSandboxPOC/Deploy/*
