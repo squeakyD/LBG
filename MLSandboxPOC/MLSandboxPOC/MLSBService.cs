@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Serilog;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -10,20 +11,26 @@ using System.Threading.Tasks;
 
 namespace MLSandboxPOC
 {
-    partial class Service : ServiceBase
+    partial class MLSBService : ServiceBase
     {
-        public Service()
+        private readonly ILogger _logger = Logger.GetLog<MLSBService>();
+
+        public MLSBService()
         {
             InitializeComponent();
         }
 
         protected override void OnStart(string[] args)
         {
-            ProcessRunner.Instance.Run();
+            _logger.Information("Starting service");
+
+            // Start pipeline asynchronously to prevent risk of service start timeout.
+            Task.Run(() => ProcessRunner.Instance.Run());
         }
 
         protected override void OnStop()
         {
+            _logger.Warning("Stopping service");
             ProcessRunner.Instance.Shutdown();
         }
     }

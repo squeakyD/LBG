@@ -1,6 +1,6 @@
 ﻿namespace MLSandboxPOC
 {
-    partial class Service
+    partial class MLSBService
     {
         /// <summary> 
         /// Required designer variable.

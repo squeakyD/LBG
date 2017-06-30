@@ -22,13 +22,18 @@ namespace MLSandboxPOC
             {
                 _logger = Logger.GetLog<Program>();
 
+                // Is this running as a service?
+                if (!Environment.UserInteractive)
+                {
+                    System.ServiceProcess.ServiceBase.Run(new MLSBService());
+                    return;
+                }
+
                 //AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
 
                 Console.WriteLine("ML Sandbox POC");
                 Console.WriteLine("==============");
                 Console.WriteLine();
-
-                //InitialiseMediaServicesClient();
 
                 //string src = Path.Combine(_sourceDir, "4th Apr 17_612026009250275cut.wav");
                 //string src = Path.Combine(_sourceDir, "612026009249280 040417_1.wav");
@@ -100,7 +105,7 @@ namespace MLSandboxPOC
                         new { key.ContentKeyType, key.EncryptedContentKey, key.ProtectionKeyId });
                 }
 
-                foreach (var af in asset.AssetFiles)    
+                foreach (var af in asset.AssetFiles)
                 {
                     _logger.Information("   Asset has file {file}", af.ToLog());
                 }

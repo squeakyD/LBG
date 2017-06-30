@@ -20,42 +20,61 @@ namespace MLSandboxPOC
 
         private ProcessRunner()
         {
-            InitialiseMediaServicesClient();
         }
 
         public void Run()
         {
+            _logger.Information("Creating processing pipeline");
             try
             {
+                InitialiseMediaServicesClient();
                 //_restClient = new MSRestClient(_cachedCredentials);
 
                 _downloadManager = DownloadManager.CreateDownloadManager(Config.Instance.NumberOfConcurrentDownloads);
 
                 var fileProcessNotifier = FileProcessNotifier.Instance;
 
-                string configuration = File.ReadAllText("config.json");
+                _logger.Verbose(Directory.GetCurrentDirectory());
+                string configuration = File.ReadAllText(Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "config.json"));
                 _indexingJobManager = IndexingJobManager.CreateIndexingJobManager(configuration, _downloadManager);
 
                 _uploadManager = UploadManager.CreateUploadManager(fileProcessNotifier, _indexingJobManager,
                     Config.Instance.NumberOfConcurrentUploads);
 
                 _fileSourceManager = FileSourceManager.CreateFileSourceManager(_uploadManager, fileProcessNotifier);
+
+                _logger.Information("Processing pipeline created");
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Fatal error in ML Sandbox POC!!!");
+                throw;
             }
         }
 
         public void Shutdown()
         {
-            _fileSourceManager.ShutdownTimer();
-            var t1 = _uploadManager.WaitForAllTasks();
-            t1.Wait();
-            var t2 = _indexingJobManager.WaitForAllTasks();
-            t2.Wait();
-            var t3 = _downloadManager.WaitForAllTasks();
-            t3.Wait();
+            _logger.Information("Shutting down processing pipeline");
+
+            if (_fileSourceManager != null)
+            {
+                _fileSourceManager.ShutdownTimer();
+            }
+            if (_uploadManager != null)
+            {
+                var t1 = _uploadManager.WaitForAllTasks();
+                t1.Wait();
+            }
+            if (_indexingJobManager != null)
+            {
+                var t2 = _indexingJobManager.WaitForAllTasks();
+                t2.Wait();
+            }
+            if (_downloadManager != null)
+            {
+                var t3 = _downloadManager.WaitForAllTasks();
+                t3.Wait();
+            }
         }
 
         private void InitialiseMediaServicesClient()

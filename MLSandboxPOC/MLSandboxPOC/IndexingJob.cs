@@ -94,8 +94,12 @@ namespace MLSandboxPOC
 
         private void StateChanged(object sender, JobStateChangedEventArgs e)
         {
-            Console.WriteLine("Job state changed event:");
-            Console.WriteLine("  Previous state: " + e.PreviousState);
+            if (Environment.UserInteractive)
+            {
+                Console.WriteLine("Job state changed event:");
+                Console.WriteLine("  Previous state: " + e.PreviousState);
+            }
+
             _logger.Verbose("  Current job state: " + e.CurrentState);
             IJob job = (IJob) sender;
             var asset = job.InputMediaAssets.FirstOrDefault();
@@ -111,16 +115,16 @@ namespace MLSandboxPOC
                    break;
                 case JobState.Canceling:
                 case JobState.Queued:
-                    Console.WriteLine("Please wait...");
+                    if (Environment.UserInteractive) Console.WriteLine("Please wait...");
                     break;
                 case JobState.Scheduled:
-                    Console.WriteLine("Please wait...");
+                    if (Environment.UserInteractive) Console.WriteLine("Please wait...");
                     break;
                 case JobState.Processing:
                     //JobData.InputAssetKeyRestored = DateTime.Now;
                     //MediaServicesUtils.RestoreEncryptionKey(_context, JobData);
                     JobData.OutputAssetCreated = DateTime.Now;
-                    Console.WriteLine("Please wait...");
+                    if (Environment.UserInteractive) Console.WriteLine("Please wait...");
                     //if (_deleteFiles)
                     //{
                     //    DeleteAsset();
