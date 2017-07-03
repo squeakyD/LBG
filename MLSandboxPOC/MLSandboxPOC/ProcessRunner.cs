@@ -34,8 +34,7 @@ namespace MLSandboxPOC
 
                 var fileProcessNotifier = FileProcessNotifier.Instance;
 
-                _logger.Verbose(Directory.GetCurrentDirectory());
-                string configuration = File.ReadAllText(Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "config.json"));
+                string configuration = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json"));
                 _indexingJobManager = IndexingJobManager.CreateIndexingJobManager(configuration, _downloadManager);
 
                 _uploadManager = UploadManager.CreateUploadManager(fileProcessNotifier, _indexingJobManager,

@@ -5,30 +5,36 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ProtectCreds"
         mc:Ignorable="d"
-        Title="Setup POC Credentials" Height="246.4" Width="480" ResizeMode="NoResize" Topmost="True" WindowStartupLocation="CenterScreen" >
+        Title="Setup POC Credentials" Height="340" Width="485" ResizeMode="CanMinimize" Topmost="True" WindowStartupLocation="CenterScreen" >
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition/>
             <ColumnDefinition Width="0*"/>
         </Grid.ColumnDefinitions>
-        
-        <TextBlock x:Name="textBlock" HorizontalAlignment="Left" Margin="10,10,0,0" TextWrapping="Wrap" Text="Please fill in the following details, which can be found under Azure Media Services -> API Access blade" VerticalAlignment="Top" FontStyle="Italic" TextDecorations="{x:Null}" Width="423"/>
+
+        <TextBlock x:Name="textBlock" HorizontalAlignment="Left" Margin="10,10,0,0" TextWrapping="Wrap" VerticalAlignment="Top" FontStyle="Italic" TextAlignment="Center" TextDecorations="{x:Null}" Width="440"><Run Text="Please fill in the following details, which can be found under"/><LineBreak/><Run Text="Azure Media Services -&gt; API Access blade"/></TextBlock>
 
         <StackPanel x:Name="container" HorizontalAlignment="Left" Margin="10,60,0,0" VerticalAlignment="Top">
             <StackPanel Orientation="Horizontal">
                 <StackPanel Orientation="Vertical">
-                    <Label x:Name="label" Content="Application Id " HorizontalAlignment="Left"  Height="23" />
-                    <Label x:Name="label2" Content="Application Key" HorizontalAlignment="Left" Height="25" Margin="0,2"/>
-                    <Label x:Name="label3" Content="Azure Active Directory tenant domain" HorizontalAlignment="Left" Height="25" Margin="0,2"/>
+                    <Label x:Name="label" Content="Application Id"  Height="25" Width="210" HorizontalContentAlignment="Right" Margin="0,4" />
+                    <Label x:Name="label2" Content="Application Key" Height="25" Margin="0,4" Width="210" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label3" Content="Azure Active Directory Tenant Domain" HorizontalAlignment="Left" Height="25" Width="210" Margin="0,4" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label4" Content="Service User Id" HorizontalAlignment="Left" Height="25" Width="210" Margin="0,4" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label5" Content="Service User Password"  Height="25" Margin="0,4" Width="210" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label6" Content="Service User Domain"  Height="25" Margin="0,4" Width="210" HorizontalContentAlignment="Right"/>
                 </StackPanel>
                 <StackPanel Orientation="Vertical" Margin="5,0">
-                    <TextBox x:Name="_appId" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Width="232"/>
-                    <TextBox x:Name="_key" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Margin="0,4" Width="232"/>
-                    <TextBox x:Name="_tenant" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Margin="0,4" Width="232"/>
+                    <TextBox x:Name="_appId" HorizontalAlignment="Left" Height="25" TextWrapping="Wrap" Text="" Margin="0,4" VerticalAlignment="Center" Width="232"/>
+                    <TextBox x:Name="_key" HorizontalAlignment="Left" Height="25" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Margin="0,4" Width="232"/>
+                    <TextBox x:Name="_tenant" HorizontalAlignment="Left" Height="25" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Margin="0,4" Width="232"/>
+                    <TextBox x:Name="_userId" HorizontalAlignment="Left" Height="25" TextWrapping="Wrap" Text="" VerticalAlignment="Center" Margin="0,4" Width="232"/>
+                    <PasswordBox x:Name="_password" HorizontalAlignment="Left" Height="25"  VerticalAlignment="Center" Margin="0,4" Width="232"/>
+                    <TextBox x:Name="_domain" HorizontalAlignment="Left" Height="25"  VerticalAlignment="Center" Margin="0,4" Width="232"/>
                 </StackPanel>
             </StackPanel>
         </StackPanel>
-        <Button x:Name="_btnSetConfig" Content="Set Config"  VerticalAlignment="Top" Click="setConfig_Click" Margin="130,171,154.2,0" Height="19"/>
+        <Button x:Name="_btnSetConfig" Content="Set Config"  VerticalAlignment="Top" Click="setConfig_Click" Margin="145,271,153.4,0" Height="22" RenderTransformOrigin="0.765,0.682"/>
 
     </Grid>
 </Window>

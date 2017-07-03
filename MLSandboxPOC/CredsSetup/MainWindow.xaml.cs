@@ -2,6 +2,7 @@
 using System.Configuration;
 using System.IO;
 using System.Windows;
+using CredsSetup;
 
 
 namespace ProtectCreds
@@ -18,13 +19,17 @@ namespace ProtectCreds
 
         private void setConfig_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(_appId.Text) || string.IsNullOrWhiteSpace(_key.Text) || string.IsNullOrWhiteSpace(_tenant.Text))
+            if (string.IsNullOrWhiteSpace(_appId.Text) || string.IsNullOrWhiteSpace(_key.Text) || string.IsNullOrWhiteSpace(_tenant.Text) ||
+                string.IsNullOrWhiteSpace(_userId.Text) || string.IsNullOrWhiteSpace(_password.Password))
             {
                 MessageBox.Show("Please enter a value for all fields");
                 return;
             }
 
-            EncryptConfigSection(_appId.Text, _key.Text, _tenant.Text);
+            using (new Impersonator(_userId.Text, _domain.Text, _password.Password))
+            {
+                EncryptConfigSection(_appId.Text, _key.Text, _tenant.Text);
+            }
         }
 
 
