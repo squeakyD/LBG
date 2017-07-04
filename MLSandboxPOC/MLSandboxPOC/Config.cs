@@ -104,8 +104,6 @@ namespace MLSandboxPOC
             }
         }
 
-        //public string MediaServicesAccountName => GetStringVal("MediaServicesAccountName", ref _mediaServicesAccountName);
-        //public string MediaServicesAccountKey => GetStringVal("MediaServicesAccountKey", ref _mediaServicesAccountKey);
         public string SourceDirectory => _sourceDirectory;
 
         public string ProcessedDirectory => _processedDirectory;

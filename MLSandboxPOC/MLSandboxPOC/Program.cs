@@ -14,8 +14,6 @@ namespace MLSandboxPOC
 
         private static ILogger _logger;
 
-        //private static MSRestClient _restClient;
-
         static void Main(string[] args)
         {
             try

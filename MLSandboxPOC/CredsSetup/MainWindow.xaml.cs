@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Configuration;
 using System.IO;
 using System.Windows;
@@ -26,10 +27,23 @@ namespace ProtectCreds
                 return;
             }
 
-            using (new Impersonator(_userId.Text, _domain.Text, _password.Password))
+            try
             {
-                EncryptConfigSection(_appId.Text, _key.Text, _tenant.Text);
+                using (new Impersonator(_userId.Text, _domain.Text, _password.Password))
+                {
+                    EncryptConfigSection(_appId.Text, _key.Text, _tenant.Text);
+                }
             }
+            catch (Win32Exception ex)
+            {
+                MessageBox.Show($"Error applying encryption for user '{_userId.Text}': {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error applying encryption: {ex.Message}");
+                //throw;
+            }
+
         }
 
 

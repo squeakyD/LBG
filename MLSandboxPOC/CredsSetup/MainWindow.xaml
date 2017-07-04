@@ -17,12 +17,12 @@
         <StackPanel x:Name="container" HorizontalAlignment="Left" Margin="10,60,0,0" VerticalAlignment="Top">
             <StackPanel Orientation="Horizontal">
                 <StackPanel Orientation="Vertical">
-                    <Label x:Name="label" Content="Application Id"  Height="25" Width="210" HorizontalContentAlignment="Right" Margin="0,4" />
-                    <Label x:Name="label2" Content="Application Key" Height="25" Margin="0,4" Width="210" HorizontalContentAlignment="Right"/>
-                    <Label x:Name="label3" Content="Azure Active Directory Tenant Domain" HorizontalAlignment="Left" Height="25" Width="210" Margin="0,4" HorizontalContentAlignment="Right"/>
-                    <Label x:Name="label4" Content="Service User Id" HorizontalAlignment="Left" Height="25" Width="210" Margin="0,4" HorizontalContentAlignment="Right"/>
-                    <Label x:Name="label5" Content="Service User Password"  Height="25" Margin="0,4" Width="210" HorizontalContentAlignment="Right"/>
-                    <Label x:Name="label6" Content="Service User Domain"  Height="25" Margin="0,4" Width="210" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label" Content="Application Id"  Height="25" Width="215" HorizontalContentAlignment="Right" Margin="0,4" />
+                    <Label x:Name="label2" Content="Application Key" Height="25" Margin="0,4" Width="215" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label3" Content="Azure Active Directory Tenant Domain" HorizontalAlignment="Left" Height="25" Width="215" Margin="0,4" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label4" Content="Service User Id" HorizontalAlignment="Left" Height="25" Width="215" Margin="0,4" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label5" Content="Service User Password"  Height="25" Margin="0,4" Width="215" HorizontalContentAlignment="Right"/>
+                    <Label x:Name="label6" Content="Service User Domain"  Height="25" Margin="0,4" Width="215" HorizontalContentAlignment="Right"/>
                 </StackPanel>
                 <StackPanel Orientation="Vertical" Margin="5,0">
                     <TextBox x:Name="_appId" HorizontalAlignment="Left" Height="25" TextWrapping="Wrap" Text="" Margin="0,4" VerticalAlignment="Center" Width="232"/>

@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CredsSetup
 {
- 
+
     /// <summary>
     /// Impersonation of a user. Allows to execute code under another
     /// user context.
@@ -34,9 +30,12 @@ namespace CredsSetup
 
     /// </remarks>
     /// 
-    class Impersonator :IDisposable
+    class Impersonator : IDisposable
     {
+        private WindowsImpersonationContext _impersonationContext;
+
         #region Public methods.
+
         // ------------------------------------------------------------------
 
         /// <summary>
@@ -47,18 +46,17 @@ namespace CredsSetup
         /// <param name="userName">The name of the user to act as.</param>
         /// <param name="domainName">The domain name of the user to act as.</param>
         /// <param name="password">The password of the user to act as.</param>
-        public Impersonator(
-            string userName,
-            string domainName,
-            string password)
+        public Impersonator(string userName, string domainName, string password)
         {
             ImpersonateValidUser(userName, domainName, password);
         }
 
         // ------------------------------------------------------------------
+
         #endregion
 
         #region IDisposable member.
+
         // ------------------------------------------------------------------
 
         public void Dispose()
@@ -67,9 +65,11 @@ namespace CredsSetup
         }
 
         // ------------------------------------------------------------------
+
         #endregion
 
         #region P/Invoke.
+
         // ------------------------------------------------------------------
 
         [DllImport("advapi32.dll", SetLastError = true)]
@@ -91,11 +91,7 @@ namespace CredsSetup
         private static extern bool RevertToSelf();
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
-        private static extern bool CloseHandle(
-            IntPtr handle);
-
-        private const int LOGON32_LOGON_INTERACTIVE = 2;
-        private const int LOGON32_PROVIDER_DEFAULT = 0;
+        private static extern bool CloseHandle(IntPtr handle);
 
         public enum LogonType
         {
@@ -117,9 +113,11 @@ namespace CredsSetup
         };
 
         // ------------------------------------------------------------------
+
         #endregion
 
         #region Private member.
+
         // ------------------------------------------------------------------
 
         /// <summary>
@@ -128,12 +126,8 @@ namespace CredsSetup
         /// <param name="userName">The name of the user to act as.</param>
         /// <param name="domainName">The domain name of the user to act as.</param>
         /// <param name="password">The password of the user to act as.</param>
-        private void ImpersonateValidUser(
-            string userName,
-            string domain,
-            string password)
+        private void ImpersonateValidUser(string userName, string domain, string password)
         {
-            WindowsIdentity tempWindowsIdentity = null;
             IntPtr token = IntPtr.Zero;
             IntPtr tokenDuplicate = IntPtr.Zero;
 
@@ -145,14 +139,14 @@ namespace CredsSetup
                             userName,
                             domain,
                             password,
-                            LOGON32_LOGON_INTERACTIVE,
-                            LOGON32_PROVIDER_DEFAULT,
+                            (int) LogonType.LOGON32_LOGON_INTERACTIVE,
+                            (int) LogonProvider.LOGON32_PROVIDER_DEFAULT,
                             ref token) != 0)
                     {
                         if (DuplicateToken(token, 2, ref tokenDuplicate) != 0)
                         {
-                            tempWindowsIdentity = new WindowsIdentity(tokenDuplicate);
-                            impersonationContext = tempWindowsIdentity.Impersonate();
+                            var tempWindowsIdentity = new WindowsIdentity(tokenDuplicate);
+                            _impersonationContext = tempWindowsIdentity.Impersonate();
                         }
                         else
                         {
@@ -187,15 +181,10 @@ namespace CredsSetup
         /// </summary>
         private void UndoImpersonation()
         {
-            if (impersonationContext != null)
-            {
-                impersonationContext.Undo();
-            }
+            _impersonationContext?.Undo();
         }
 
-        private WindowsImpersonationContext impersonationContext = null;
-
-        // ------------------------------------------------------------------
+        // --------------------------------------------------
         #endregion
     }
 }
