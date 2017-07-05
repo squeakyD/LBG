@@ -50,7 +50,6 @@ namespace CredsSetup
         {
             try
             {
-                string pwd = AppDomain.CurrentDomain.BaseDirectory;
                 string path = ConfigurationManager.AppSettings["POCPath"];
 
                 Configuration config = ConfigurationManager.OpenExeConfiguration(Path.Combine(path, "MLSandboxPOC.exe"));
