@@ -4,9 +4,10 @@ using System.Configuration;
 using System.IO;
 using System.Windows;
 using CredsSetup;
+using CredsSetup.Impersonation;
 
 
-namespace ProtectCreds
+namespace CredsSetup
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -29,10 +30,8 @@ namespace ProtectCreds
 
             try
             {
-                using (new Impersonator(_userId.Text, _domain.Text, _password.Password))
-                {
-                    EncryptConfigSection(_appId.Text, _key.Text, _tenant.Text);
-                }
+                Impersonator.RunAsUser(_userId.Text, _domain.Text, _password.Password,
+                    () => EncryptConfigSection(_appId.Text, _key.Text, _tenant.Text));
             }
             catch (Win32Exception ex)
             {
@@ -51,6 +50,7 @@ namespace ProtectCreds
         {
             try
             {
+                string pwd = AppDomain.CurrentDomain.BaseDirectory;
                 string path = ConfigurationManager.AppSettings["POCPath"];
 
                 Configuration config = ConfigurationManager.OpenExeConfiguration(Path.Combine(path, "MLSandboxPOC.exe"));
